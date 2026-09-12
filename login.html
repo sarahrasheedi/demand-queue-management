@@ -79,45 +79,58 @@
 
     <!-- Logic Script -->
     <script>
-        // Authorized users dictionary
-        const authorizedUsers = {
-            "wasmiya@company.com": "admin123",
-            "developer@company.com": "admin123"
-        };
+    const form = document.getElementById('loginForm');
+    const alertBox = document.getElementById('alertBox');
 
-        const form = document.getElementById('loginForm');
-        const alertBox = document.getElementById('alertBox');
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const email = document.getElementById('emailInput').value.toLowerCase().trim();
+        const password = document.getElementById('passwordInput').value;
 
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const email = document.getElementById('emailInput').value.toLowerCase().trim();
-            const password = document.getElementById('passwordInput').value;
+        // 1. التحقق هل البريد موجود في جدول المطورين المصرح لهم
+        const { data: dev, error: devError } = await supabaseClient
+            .from('authorized_developers')
+            .select('*')
+            .eq('email', email)
+            .single();
 
-            // Check authorization
-            if (!(email in authorizedUsers)) {
-                showAlert("بريدك ليس مصرح للدخول لهذه الصفحة", "error");
-            } else if (authorizedUsers[email] !== password) {
-                showAlert("كلمة المرور غير صحيحة", "error");
-            } else {
-                showAlert("تم التحقق بنجاح، جاري الانتقال...", "success");
-                setTimeout(() => {
-                    window.location.href = "admin.html";
-                }, 800);
-            }
+        if (devError || !dev) {
+            showAlert("عذراً، هذا البريد غير مصرح له بالدخول كـ مَطور", "error");
+            return;
+        }
+
+        // 2. التحقق من كلمة المرور عبر Supabase Auth
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
         });
 
-        function showAlert(message, type) {
-            alertBox.innerText = message;
-            alertBox.classList.remove('hidden', 'bg-brand-coral-light', 'text-brand-coral', 'border-brand-coral/30', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
-            
-            if (type === "error") {
-                alertBox.classList.add('bg-brand-coral-light', 'text-brand-coral', 'border-brand-coral/30');
-            } else {
-                alertBox.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
-            }
+        if (error) {
+            showAlert("كلمة المرور غير صحيحة أو الحساب غير مفعل", "error");
+        } else {
+            // حفظ اسم ودور المطور في جلسة المتصفح لاستخدامها في صفحة الأدمن
+            localStorage.setItem('userEmail', dev.email);
+            localStorage.setItem('userRole', dev.role);
+
+            showAlert("تم التحقق بنجاح، جاري الانتقال...", "success");
+            setTimeout(() => {
+                window.location.href = "admin.html";
+            }, 800);
         }
-    </script>
+    });
+
+    function showAlert(message, type) {
+        alertBox.innerText = message;
+        alertBox.classList.remove('hidden', 'bg-brand-coral-light', 'text-brand-coral', 'border-brand-coral/30', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+        
+        if (type === "error") {
+            alertBox.classList.add('bg-brand-coral-light', 'text-brand-coral', 'border-brand-coral/30');
+        } else {
+            alertBox.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+        }
+    }
+</script>
 
 </body>
 </html>
