@@ -5,6 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Developer Portal Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                purple: '#4f008c',
+                'purple-hover': '#3d006d',
+                'purple-light': '#f3e8ff',
+                coral: '#f84362',
+                'coral-hover': '#e03250',
+                'coral-light': '#ffeef1',
+                dark: '#2d0050'
+              }
+            }
+          }
+        }
+      }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Cairo', sans-serif; }
@@ -13,11 +32,11 @@
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col justify-between">
 
     <!-- Header -->
-    <nav class="bg-slate-900 text-white px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+    <nav class="bg-brand-dark text-white px-6 py-4 border-b border-brand-purple flex justify-between items-center">
         <div class="flex items-center">
             <span class="font-bold text-lg tracking-wide">Demand Queue System</span>
         </div>
-        <a href="index.html" class="text-xs font-semibold text-slate-300 hover:text-white transition">
+        <a href="index.html" class="text-xs font-semibold text-purple-200 hover:text-white transition">
             ← Back to Public View
         </a>
     </nav>
@@ -27,7 +46,7 @@
         <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-8 max-w-md w-full">
             
             <div class="text-center mb-6">
-                <h2 class="text-xl font-bold text-slate-900">Developer Portal</h2>
+                <h2 class="text-xl font-bold text-brand-dark">Developer Portal</h2>
             </div>
 
             <!-- Notification Alert -->
@@ -37,15 +56,15 @@
             <form id="loginForm" class="space-y-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Corporate Email</label>
-                    <input type="email" id="emailInput" required placeholder="developer@company.com" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                    <input type="email" id="emailInput" required placeholder="developer@company.com" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple transition">
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Password</label>
-                    <input type="password" id="passwordInput" required placeholder="••••••••" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                    <input type="password" id="passwordInput" required placeholder="••••••••" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-purple transition">
                 </div>
 
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm py-2.5 rounded-lg transition duration-200 shadow-sm mt-2">
+                <button type="submit" class="w-full bg-brand-purple hover:bg-brand-purple-hover text-white font-semibold text-sm py-2.5 rounded-lg transition duration-200 shadow-sm mt-2">
                     Sign In
                 </button>
             </form>
@@ -90,10 +109,10 @@
 
         function showAlert(message, type) {
             alertBox.innerText = message;
-            alertBox.classList.remove('hidden', 'bg-rose-50', 'text-rose-700', 'border-rose-200', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+            alertBox.classList.remove('hidden', 'bg-brand-coral-light', 'text-brand-coral', 'border-brand-coral/30', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
             
             if (type === "error") {
-                alertBox.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-200');
+                alertBox.classList.add('bg-brand-coral-light', 'text-brand-coral', 'border-brand-coral/30');
             } else {
                 alertBox.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
             }
