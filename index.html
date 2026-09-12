@@ -165,6 +165,26 @@
     <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
         Developed by <strong>Sarah Alrasheedi</strong>
     </footer>
+    <script>
+    async function loadDemands() {
+        // جلب البيانات من جدول demands
+        const { data: demands, error } = await supabaseClient
+            .from('demands')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching demands:', error);
+            return;
+        }
+
+        console.log('Fetched demands successfully:', demands);
+        // هنا سيتم إضافة كود عرض البيانات في الجدول والكروت
+    }
+
+    // تشغيل الدالة عند تحميل الصفحة
+    document.addEventListener('DOMContentLoaded', loadDemands);
+</script>
 
 </body>
 </html>
