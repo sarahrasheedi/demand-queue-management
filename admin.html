@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Portal - Demand Queue</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex flex-col min-h-screen">
+
+    <!-- Top Navigation Bar -->
+    <nav class="bg-slate-900 text-white px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <span class="font-bold text-lg tracking-wide">Demand Queue — Admin Portal</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="text-xs text-slate-300">Logged in as: <strong class="text-white">Wasmiya Al-Rashidi</strong></span>
+            <a href="index.html" class="text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-1.5 rounded-lg transition">
+                Logout
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Workspace -->
+    <div class="max-w-7xl mx-auto px-4 py-8 w-full flex-grow">
+        
+        <!-- Header & Action -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900">Manage Demand Queue</h2>
+                <p class="text-xs text-slate-500 mt-1">Set effort estimation and update queue status</p>
+            </div>
+            <a href="index.html" target="_blank" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 border border-indigo-200 bg-indigo-50 px-3.5 py-2 rounded-lg transition">
+                👁️ View Public Board
+            </a>
+        </div>
+
+        <!-- Management Table -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
+                        <tr>
+                            <th class="py-3.5 px-5 font-semibold">Ref ID</th>
+                            <th class="py-3.5 px-5 font-semibold">Demand / Task</th>
+                            <th class="py-3.5 px-5 font-semibold">Department</th>
+                            <th class="py-3.5 px-5 font-semibold">Est. Days</th>
+                            <th class="py-3.5 px-5 font-semibold">Calculated Due Date</th>
+                            <th class="py-3.5 px-5 font-semibold">Status</th>
+                            <th class="py-3.5 px-5 font-semibold text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-slate-700">
+                        
+                        <!-- Row 1 -->
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-4 px-5 font-bold text-indigo-600">REQ-201</td>
+                            <td class="py-4 px-5 font-semibold text-slate-900">Database Sync Module</td>
+                            <td class="py-4 px-5 text-xs text-slate-500">Technical Operations</td>
+                            <td class="py-4 px-5">
+                                <input type="number" value="5" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </td>
+                            <td class="py-4 px-5 font-semibold text-slate-800">2026-09-15</td>
+                            <td class="py-4 px-5">
+                                <select class="text-xs font-semibold px-2.5 py-1.5 rounded border border-amber-200 bg-amber-50 text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                    <option value="pending">Pending</option>
+                                    <option value="in_progress" selected>In Progress</option>
+                                    <option value="completed">Completed</option>
+                                </select>
+                            </td>
+                            <td class="py-4 px-5 text-right space-x-2">
+                                <button class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded transition">
+                                    Save
+                                </button>
+                            </td>
+                        </tr>
+
+                        <!-- Row 2 -->
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-4 px-5 font-bold text-slate-500">REQ-202</td>
+                            <td class="py-4 px-5 font-semibold text-slate-900">SLA Metrics Dashboard</td>
+                            <td class="py-4 px-5 text-xs text-slate-500">Quality & Audit</td>
+                            <td class="py-4 px-5">
+                                <input type="number" value="3" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </td>
+                            <td class="py-4 px-5 font-semibold text-slate-800">2026-09-20</td>
+                            <td class="py-4 px-5">
+                                <select class="text-xs font-semibold px-2.5 py-1.5 rounded border border-slate-200 bg-slate-100 text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="pending" selected>Pending</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                </select>
+                            </td>
+                            <td class="py-4 px-5 text-right space-x-2">
+                                <button class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded transition">
+                                    Save
+                                </button>
+                            </td>
+                        </tr>
+
+                        <!-- Row 3 -->
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-4 px-5 font-bold text-slate-500">REQ-203</td>
+                            <td class="py-4 px-5 font-semibold text-slate-900">Authentication Endpoint Update</td>
+                            <td class="py-4 px-5 text-xs text-slate-500">Security Team</td>
+                            <td class="py-4 px-5">
+                                <input type="number" value="4" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </td>
+                            <td class="py-4 px-5 font-semibold text-slate-800">2026-09-24</td>
+                            <td class="py-4 px-5">
+                                <select class="text-xs font-semibold px-2.5 py-1.5 rounded border border-slate-200 bg-slate-100 text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="pending" selected>Pending</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                </select>
+                            </td>
+                            <td class="py-4 px-5 text-right space-x-2">
+                                <button class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded transition">
+                                    Save
+                                </button>
+                            </td>
+                        </tr>
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        Developed by <strong>Wasmiya Al-Rashidi</strong> — Software Engineering Co-Op Project 2026
+    </footer>
+
+</body>
+</html>
