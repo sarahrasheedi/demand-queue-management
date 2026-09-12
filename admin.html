@@ -5,6 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Portal - Demand Queue</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                purple: '#4f008c',
+                'purple-hover': '#3d006d',
+                'purple-light': '#f3e8ff',
+                coral: '#f84362',
+                'coral-hover': '#e03250',
+                'coral-light': '#ffeef1',
+                dark: '#2d0050'
+              }
+            }
+          }
+        }
+      }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Cairo', sans-serif; }
@@ -13,13 +32,13 @@
 <body class="bg-slate-100 text-slate-800 flex flex-col min-h-screen">
 
     <!-- Top Navigation Bar -->
-    <nav class="bg-slate-900 text-white px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+    <nav class="bg-brand-dark text-white px-6 py-4 border-b border-brand-purple flex justify-between items-center">
         <div class="flex items-center space-x-3">
             <span class="font-bold text-lg tracking-wide">Demand Queue — Admin Portal</span>
         </div>
         <div class="flex items-center space-x-4">
-            <span class="text-xs text-slate-300">Logged in as: <strong class="text-white">Wasmiya Al-Rashidi</strong></span>
-            <a href="index.html" class="text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-1.5 rounded-lg transition">
+            <span class="text-xs text-purple-200">Logged in as: <strong class="text-white">Wasmiya Al-Rashidi</strong></span>
+            <a href="index.html" class="text-xs font-semibold bg-brand-coral hover:bg-brand-coral-hover text-white px-3.5 py-1.5 rounded-lg transition">
                 Logout
             </a>
         </div>
@@ -34,7 +53,7 @@
                 <h2 class="text-xl font-bold text-slate-900">Manage Demand Queue</h2>
                 <p class="text-xs text-slate-500 mt-1">Set effort estimation and update queue status</p>
             </div>
-            <a href="index.html" target="_blank" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 border border-indigo-200 bg-indigo-50 px-3.5 py-2 rounded-lg transition">
+            <a href="index.html" target="_blank" class="text-xs font-semibold text-brand-purple hover:text-brand-purple-hover border border-brand-purple/20 bg-brand-purple-light px-3.5 py-2 rounded-lg transition">
                 👁️ View Public Board
             </a>
         </div>
@@ -58,11 +77,11 @@
                         
                         <!-- Row 1 -->
                         <tr class="hover:bg-slate-50 transition">
-                            <td class="py-4 px-5 font-bold text-indigo-600">REQ-201</td>
+                            <td class="py-4 px-5 font-bold text-brand-purple">REQ-201</td>
                             <td class="py-4 px-5 font-semibold text-slate-900">Database Sync Module</td>
                             <td class="py-4 px-5 text-xs text-slate-500">Technical Operations</td>
                             <td class="py-4 px-5">
-                                <input type="number" value="5" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <input type="number" value="5" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-brand-purple outline-none">
                             </td>
                             <td class="py-4 px-5 font-semibold text-slate-800">2026-09-15</td>
                             <td class="py-4 px-5">
@@ -73,7 +92,7 @@
                                 </select>
                             </td>
                             <td class="py-4 px-5 text-right space-x-2">
-                                <button class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded transition">
+                                <button class="text-xs bg-brand-purple hover:bg-brand-purple-hover text-white font-semibold px-3.5 py-1.5 rounded-lg transition">
                                     Save
                                 </button>
                             </td>
@@ -81,22 +100,22 @@
 
                         <!-- Row 2 -->
                         <tr class="hover:bg-slate-50 transition">
-                            <td class="py-4 px-5 font-bold text-slate-500">REQ-202</td>
+                            <td class="py-4 px-5 font-bold text-brand-purple">REQ-202</td>
                             <td class="py-4 px-5 font-semibold text-slate-900">SLA Metrics Dashboard</td>
                             <td class="py-4 px-5 text-xs text-slate-500">Quality & Audit</td>
                             <td class="py-4 px-5">
-                                <input type="number" value="3" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <input type="number" value="3" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-brand-purple outline-none">
                             </td>
                             <td class="py-4 px-5 font-semibold text-slate-800">2026-09-20</td>
                             <td class="py-4 px-5">
-                                <select class="text-xs font-semibold px-2.5 py-1.5 rounded border border-slate-200 bg-slate-100 text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <select class="text-xs font-semibold px-2.5 py-1.5 rounded border border-slate-200 bg-slate-100 text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-purple">
                                     <option value="pending" selected>Pending</option>
                                     <option value="in_progress">In Progress</option>
                                     <option value="completed">Completed</option>
                                 </select>
                             </td>
                             <td class="py-4 px-5 text-right space-x-2">
-                                <button class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded transition">
+                                <button class="text-xs bg-brand-purple hover:bg-brand-purple-hover text-white font-semibold px-3.5 py-1.5 rounded-lg transition">
                                     Save
                                 </button>
                             </td>
@@ -104,22 +123,22 @@
 
                         <!-- Row 3 -->
                         <tr class="hover:bg-slate-50 transition">
-                            <td class="py-4 px-5 font-bold text-slate-500">REQ-203</td>
+                            <td class="py-4 px-5 font-bold text-brand-purple">REQ-203</td>
                             <td class="py-4 px-5 font-semibold text-slate-900">Authentication Endpoint Update</td>
                             <td class="py-4 px-5 text-xs text-slate-500">Security Team</td>
                             <td class="py-4 px-5">
-                                <input type="number" value="4" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <input type="number" value="4" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-brand-purple outline-none">
                             </td>
                             <td class="py-4 px-5 font-semibold text-slate-800">2026-09-24</td>
                             <td class="py-4 px-5">
-                                <select class="text-xs font-semibold px-2.5 py-1.5 rounded border border-slate-200 bg-slate-100 text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <select class="text-xs font-semibold px-2.5 py-1.5 rounded border border-slate-200 bg-slate-100 text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-purple">
                                     <option value="pending" selected>Pending</option>
                                     <option value="in_progress">In Progress</option>
                                     <option value="completed">Completed</option>
                                 </select>
                             </td>
                             <td class="py-4 px-5 text-right space-x-2">
-                                <button class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded transition">
+                                <button class="text-xs bg-brand-purple hover:bg-brand-purple-hover text-white font-semibold px-3.5 py-1.5 rounded-lg transition">
                                     Save
                                 </button>
                             </td>
