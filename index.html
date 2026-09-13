@@ -66,35 +66,74 @@
 
     </div>
 
-    <script>
-let publicDemandsList = []; // أضيفي هذا المتغير في بداية السكربت لتخزين البيانات
+<script>
+    let publicDemands = [];
 
-async function fetchPublicDemands() {
-    const { data: demands, error } = await supabaseClient
-        .from('demands')
-        .select('*')
-        .order('id', { ascending: false });
+    // 1. جلب البيانات من Supabase وعرضها
+    async function loadPublicDemands() {
+        const grid = document.getElementById('demandsGrid'); // أو المكان الذي تعرضين فيه البطاقات/الجدول
+        if (!grid) return;
 
-    if (error) {
-        console.error("Error fetching demands:", error);
-        return;
+        const { data: demands, error } = await supabaseClient
+            .from('demands')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (error) {
+            console.error("Error fetching demands for dashboard:", error);
+            return;
+        }
+
+        publicDemands = demands || [];
+        renderPublicBoard(publicDemands);
     }
 
-    publicDemandsList = demands || []; // احفظي البيانات هنا
-    renderPublicCards(publicDemandsList);
-}
+    // 2. دالة طباعة البطاقات أو الصفوف في الداشبورد
+    function renderPublicBoard(demands) {
+        const grid = document.getElementById('demandsGrid'); // غيري ID العنصر بحسب كودك
+        if (!grid) return;
 
-// أضيفي هذه الدالة الجديدة بالكامل في أسفل السكربت:
-function filterPublicDemands() {
-    const query = document.getElementById('publicSearchInput').value.toLowerCase().trim();
-    const filtered = publicDemandsList.filter(item => {
-        const refId = (item.ref_id || 'REQ-' + (100 + item.id)).toLowerCase();
-        const title = (item.title || '').toLowerCase();
-        const dept = (item.department || '').toLowerCase();
-        return refId.includes(query) || title.includes(query) || dept.includes(query);
-    });
-    renderPublicCards(filtered);
-}
-    </script>
+        if (!demands || demands.length === 0) {
+            grid.innerHTML = `<div class="col-span-full text-center py-8 text-slate-400">No demands available.</div>`;
+            return;
+        }
+
+        grid.innerHTML = '';
+        demands.forEach(item => {
+            const card = document.createElement('div');
+            card.className = "bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3";
+            card.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-brand-purple">${item.ref_id || 'REQ-' + (100 + item.id)}</span>
+                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full ${getStatusStyle(item.status)}">
+                        ${formatStatus(item.status)}
+                    </span>
+                </div>
+                <h3 class="font-bold text-slate-900 text-sm">${item.title}</h3>
+                <div class="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-slate-100">
+                    <span>${item.department}</span>
+                    <span>Due: ${item.due_date || 'N/A'}</span>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    // تنسيق شكل الحالة (Status)
+    function getStatusStyle(status) {
+        if (status === 'completed') return 'bg-emerald-100 text-emerald-700';
+        if (status === 'in_progress') return 'bg-amber-100 text-amber-700';
+        return 'bg-slate-100 text-slate-600';
+    }
+
+    function formatStatus(status) {
+        if (status === 'completed') return 'Completed';
+        if (status === 'in_progress') return 'In Progress';
+        return 'Pending';
+    }
+
+    // تشغيل جلب البيانات عند تحميل الصفحة
+    document.addEventListener('DOMContentLoaded', loadPublicDemands);
+</script>
 </body>
 </html>
