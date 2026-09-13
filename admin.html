@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
     <!-- 1. مكتبة سوبابايس الرسمية -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- 2. ملف الإعدادات الذي أنشأناه -->
-<script src="supabase-config.js"></script>
+    <!-- 2. ملف الإعدادات -->
+    <script src="supabase-config.js"></script>
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Portal - Demand Queue</title>
@@ -43,9 +44,9 @@
         </div>
         <div class="flex items-center space-x-4">
             <span class="text-xs text-purple-200">Logged in as: <strong class="text-white">Sarah Alrasheedi</strong></span>
-            <a href="index.html" class="text-xs font-semibold bg-brand-coral hover:bg-brand-coral-hover text-white px-3.5 py-1.5 rounded-lg transition">
+            <button onclick="logout()" class="text-xs font-semibold bg-brand-coral hover:bg-brand-coral-hover text-white px-3.5 py-1.5 rounded-lg transition">
                 Logout
-            </a>
+            </button>
         </div>
     </nav>
 
@@ -78,77 +79,10 @@
                             <th class="py-3.5 px-5 font-semibold text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100 text-slate-700">
-                        
-                        <!-- Row 1 -->
-                        <tr class="hover:bg-slate-50 transition">
-                            <td class="py-4 px-5 font-bold text-brand-purple">REQ-201</td>
-                            <td class="py-4 px-5 font-semibold text-slate-900">Database Sync Module</td>
-                            <td class="py-4 px-5 text-xs text-slate-500">Technical Operations</td>
-                            <td class="py-4 px-5">
-                                <input type="number" value="5" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-brand-purple outline-none">
-                            </td>
-                            <td class="py-4 px-5 font-semibold text-slate-800">2026-09-15</td>
-                            <td class="py-4 px-5">
-                                <select class="text-xs font-semibold px-2.5 py-1.5 rounded border border-amber-200 bg-amber-50 text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                                    <option value="pending">Pending</option>
-                                    <option value="in_progress" selected>In Progress</option>
-                                    <option value="completed">Completed</option>
-                                </select>
-                            </td>
-                            <td class="py-4 px-5 text-right space-x-2">
-                                <button class="text-xs bg-brand-purple hover:bg-brand-purple-hover text-white font-semibold px-3.5 py-1.5 rounded-lg transition">
-                                    Save
-                                </button>
-                            </td>
+                    <tbody id="demandsTableBody" class="divide-y divide-slate-100 text-slate-700">
+                        <tr>
+                            <td colspan="7" class="py-6 text-center text-slate-400">Loading demands...</td>
                         </tr>
-
-                        <!-- Row 2 -->
-                        <tr class="hover:bg-slate-50 transition">
-                            <td class="py-4 px-5 font-bold text-brand-purple">REQ-202</td>
-                            <td class="py-4 px-5 font-semibold text-slate-900">SLA Metrics Dashboard</td>
-                            <td class="py-4 px-5 text-xs text-slate-500">Quality & Audit</td>
-                            <td class="py-4 px-5">
-                                <input type="number" value="3" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-brand-purple outline-none">
-                            </td>
-                            <td class="py-4 px-5 font-semibold text-slate-800">2026-09-20</td>
-                            <td class="py-4 px-5">
-                                <select class="text-xs font-semibold px-2.5 py-1.5 rounded border border-slate-200 bg-slate-100 text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-purple">
-                                    <option value="pending" selected>Pending</option>
-                                    <option value="in_progress">In Progress</option>
-                                    <option value="completed">Completed</option>
-                                </select>
-                            </td>
-                            <td class="py-4 px-5 text-right space-x-2">
-                                <button class="text-xs bg-brand-purple hover:bg-brand-purple-hover text-white font-semibold px-3.5 py-1.5 rounded-lg transition">
-                                    Save
-                                </button>
-                            </td>
-                        </tr>
-
-                        <!-- Row 3 -->
-                        <tr class="hover:bg-slate-50 transition">
-                            <td class="py-4 px-5 font-bold text-brand-purple">REQ-203</td>
-                            <td class="py-4 px-5 font-semibold text-slate-900">Authentication Endpoint Update</td>
-                            <td class="py-4 px-5 text-xs text-slate-500">Security Team</td>
-                            <td class="py-4 px-5">
-                                <input type="number" value="4" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-brand-purple outline-none">
-                            </td>
-                            <td class="py-4 px-5 font-semibold text-slate-800">2026-09-24</td>
-                            <td class="py-4 px-5">
-                                <select class="text-xs font-semibold px-2.5 py-1.5 rounded border border-slate-200 bg-slate-100 text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-purple">
-                                    <option value="pending" selected>Pending</option>
-                                    <option value="in_progress">In Progress</option>
-                                    <option value="completed">Completed</option>
-                                </select>
-                            </td>
-                            <td class="py-4 px-5 text-right space-x-2">
-                                <button class="text-xs bg-brand-purple hover:bg-brand-purple-hover text-white font-semibold px-3.5 py-1.5 rounded-lg transition">
-                                    Save
-                                </button>
-                            </td>
-                        </tr>
-
                     </tbody>
                 </table>
             </div>
@@ -161,5 +95,92 @@
         Developed by <strong>Sarah Alrasheedi</strong> 
     </footer>
 
+    <!-- Script للاتصال بـ Supabase والتحكم بالصفحة -->
+    <script>
+        // 1. حماية الصفحة
+        if (localStorage.getItem('isLoggedIn') !== 'true') {
+            window.location.href = "login.html";
+        }
+
+        // 2. دالة تسجيل الخروج
+        function logout() {
+            localStorage.removeItem('isLoggedIn');
+            localStorage.removeItem('userEmail');
+            window.location.href = "login.html";
+        }
+
+        // 3. جلب الطلبات من Supabase وعرضها في الجدول
+        async function loadAdminDemands() {
+            const { data: demands, error } = await supabaseClient
+                .from('demands')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            const tbody = document.getElementById('demandsTableBody');
+
+            if (error) {
+                console.error('Error fetching demands:', error);
+                tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-red-500">Failed to load data. Please refresh.</td></tr>`;
+                return;
+            }
+
+            if (!demands || demands.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-400">No demands found.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = '';
+
+            demands.forEach(item => {
+                const row = document.createElement('tr');
+                row.className = "hover:bg-slate-50 transition";
+                row.innerHTML = `
+                    <td class="py-4 px-5 font-bold text-brand-purple">${item.ref_id || 'REQ-' + item.id}</td>
+                    <td class="py-4 px-5 font-semibold text-slate-900">${item.title}</td>
+                    <td class="py-4 px-5 text-xs text-slate-500">${item.department || 'N/A'}</td>
+                    <td class="py-4 px-5">
+                        <input type="number" id="effort-${item.id}" value="${item.estimated_days || 0}" class="w-16 px-2 py-1 border border-slate-300 rounded text-center text-xs font-bold focus:ring-2 focus:ring-brand-purple outline-none">
+                    </td>
+                    <td class="py-4 px-5 font-semibold text-slate-800">${item.due_date || '-'}</td>
+                    <td class="py-4 px-5">
+                        <select id="status-${item.id}" class="text-xs font-semibold px-2.5 py-1.5 rounded border border-slate-200 bg-slate-100 text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-purple">
+                            <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pending</option>
+                            <option value="in_progress" ${item.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="completed" ${item.status === 'completed' ? 'selected' : ''}>Completed</option>
+                        </select>
+                    </td>
+                    <td class="py-4 px-5 text-right space-x-2">
+                        <button onclick="saveDemandChanges(${item.id})" class="text-xs bg-brand-purple hover:bg-brand-purple-hover text-white font-semibold px-3.5 py-1.5 rounded-lg transition">
+                            Save
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 4. دالة الحفظ
+        async function saveDemandChanges(id) {
+            const estimatedDays = document.getElementById(`effort-${id}`).value;
+            const status = document.getElementById(`status-${id}`).value;
+
+            const { error } = await supabaseClient
+                .from('demands')
+                .update({ 
+                    estimated_days: parseInt(estimatedDays),
+                    status: status 
+                })
+                .eq('id', id);
+
+            if (error) {
+                alert('حدث خطأ أثناء الحفظ: ' + error.message);
+            } else {
+                alert('تم حفظ التغييرات بنجاح!');
+                loadAdminDemands();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadAdminDemands);
+    </script>
 </body>
 </html>
