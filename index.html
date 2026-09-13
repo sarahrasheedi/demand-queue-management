@@ -166,6 +166,17 @@
         Developed by <strong>Sarah Alrasheedi</strong>
     </footer>
     <script>
+        // التحقق من أن المطور مسجل دخوله
+if (localStorage.getItem('isLoggedIn') !== 'true') {
+    window.location.href = "login.html";
+}
+
+// دالة تسجيل الخروج (تنسب لزر Logout فقط)
+function logout() {
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('userEmail');
+    window.location.href = "login.html";
+}
     async function loadDemands() {
         // جلب البيانات من جدول demands
         const { data: demands, error } = await supabaseClient
