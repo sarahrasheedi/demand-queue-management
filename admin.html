@@ -47,12 +47,16 @@
                 <h2 class="text-xl font-bold text-slate-900">Manage Demand Queue</h2>
                 <p class="text-xs text-slate-500 mt-1">Set effort estimation, update status, or remove demands</p>
             </div>
-            <div class="flex space-x-3">
+            <div class="flex space-x-3 items-center">
+                <!-- Search Input -->
+                <input type="text" id="adminSearchInput" oninput="filterAdminDemands()" placeholder="🔍 Search demands..." class="w-64 px-3.5 py-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-purple shadow-sm">
+                
                 <button onclick="openModal()" class="text-xs font-semibold bg-brand-purple hover:bg-brand-purple-hover text-white px-4 py-2 rounded-lg transition">
                     + Add New Demand
                 </button>
+                
                 <a href="index.html" target="_blank" class="text-xs font-semibold text-brand-purple border border-brand-purple/20 bg-brand-purple-light px-3.5 py-2 rounded-lg transition">
-                    👁️ View Public Board
+                    View Public Board
                 </a>
             </div>
         </div>
@@ -109,133 +113,160 @@
         </div>
     </div>
 
-    <script>
-        // Auth Check & Logout
-        if (localStorage.getItem('isLoggedIn') !== 'true') window.location.href = "login.html";
-        function logout() {
-            localStorage.clear();
-            window.location.href = "login.html";
+<script>
+    // متغير عام لتخزين الطلبات محلياً للبحث السريع
+    let allDemands = [];
+
+    // Auth Check & Logout
+    if (localStorage.getItem('isLoggedIn') !== 'true') window.location.href = "login.html";
+    function logout() {
+        localStorage.clear();
+        window.location.href = "login.html";
+    }
+
+    // Modal Controls
+    function openModal() { document.getElementById('addModal').classList.remove('hidden'); document.getElementById('addModal').classList.add('flex'); }
+    function closeModal() { document.getElementById('addModal').classList.add('hidden'); document.getElementById('addModal').classList.remove('flex'); }
+
+    // حساب تاريخ الاستحقاق
+    function calculateDueDate(days) {
+        if (!days || days <= 0) return null;
+        const date = new Date();
+        date.setDate(date.getDate() + parseInt(days));
+        return date.toISOString().split('T')[0];
+    }
+
+    // 1. جلب وتحديث جدول الأدمن
+    async function loadAdminDemands() {
+        const { data: demands, error } = await supabaseClient.from('demands').select('*').order('id', { ascending: false });
+        const tbody = document.getElementById('demandsTableBody');
+
+        if (error) {
+            console.error("Error fetching demands:", error);
+            tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-red-500">Error loading data. Check console.</td></tr>`;
+            return;
         }
 
-        // Modal Controls
-        function openModal() { document.getElementById('addModal').classList.remove('hidden'); document.getElementById('addModal').classList.add('flex'); }
-        function closeModal() { document.getElementById('addModal').classList.add('hidden'); document.getElementById('addModal').classList.remove('flex'); }
+        // حفظ النسخة الأصلية للبحث
+        allDemands = demands || [];
+        renderAdminTable(allDemands);
+    }
 
-        // حساب تاريخ الاستحقاق
-        function calculateDueDate(days) {
-            if (!days || days <= 0) return null;
-            const date = new Date();
-            date.setDate(date.getDate() + parseInt(days));
-            return date.toISOString().split('T')[0];
+    // دالة منفصلة لرسم صفوف الجدول
+    function renderAdminTable(demands) {
+        const tbody = document.getElementById('demandsTableBody');
+
+        if (!demands || demands.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-400">No demands found.</td></tr>`;
+            return;
         }
 
-        // 1. جلب وتحديث جدول الأدمن
-        async function loadAdminDemands() {
-            const { data: demands, error } = await supabaseClient.from('demands').select('*').order('id', { ascending: false });
-            const tbody = document.getElementById('demandsTableBody');
+        tbody.innerHTML = '';
+        demands.forEach(item => {
+            const row = document.createElement('tr');
+            row.className = "hover:bg-slate-50 transition";
+            row.innerHTML = `
+                <td class="py-4 px-5 font-bold text-brand-purple">${item.ref_id || 'REQ-' + (100 + item.id)}</td>
+                <td class="py-4 px-5 font-semibold text-slate-900">${item.title}</td>
+                <td class="py-4 px-5 text-xs text-slate-500">${item.department}</td>
+                <td class="py-4 px-5">
+                    <input type="number" id="effort-${item.id}" value="${item.estimated_days || 1}" min="1" class="w-16 px-2 py-1 border rounded text-center text-xs font-bold">
+                </td>
+                <td class="py-4 px-5 font-semibold text-slate-800">${item.due_date || '-'}</td>
+                <td class="py-4 px-5">
+                    <select id="status-${item.id}" class="text-xs font-semibold px-2.5 py-1.5 rounded border bg-slate-50">
+                        <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pending</option>
+                        <option value="in_progress" ${item.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
+                        <option value="completed" ${item.status === 'completed' ? 'selected' : ''}>Completed</option>
+                    </select>
+                </td>
+                <td class="py-4 px-5 text-right space-x-2">
+                    <button onclick="saveDemandChanges(${item.id})" class="text-xs bg-brand-purple hover:bg-brand-purple-hover text-white font-semibold px-3 py-1.5 rounded-lg">Save</button>
+                    <button onclick="deleteDemand(${item.id})" class="text-xs bg-red-100 hover:bg-red-200 text-red-600 font-semibold px-3 py-1.5 rounded-lg transition">Delete</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
 
-            if (error) {
-                console.error("Error fetching demands:", error);
-                tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-red-500">Error loading data. Check console.</td></tr>`;
-                return;
-            }
+    // 🔍 دالة التصفية حسب كلمة البحث
+    function filterAdminDemands() {
+        const query = document.getElementById('adminSearchInput').value.toLowerCase().trim();
+        
+        const filtered = allDemands.filter(item => {
+            const refId = (item.ref_id || 'REQ-' + (100 + item.id)).toLowerCase();
+            const title = (item.title || '').toLowerCase();
+            const dept = (item.department || '').toLowerCase();
+            
+            return refId.includes(query) || title.includes(query) || dept.includes(query);
+        });
 
-            if (!demands || demands.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-400">No demands found. Click "+ Add New Demand" to create one.</td></tr>`;
-                return;
-            }
+        renderAdminTable(filtered);
+    }
 
-            tbody.innerHTML = '';
-            demands.forEach(item => {
-                const row = document.createElement('tr');
-                row.className = "hover:bg-slate-50 transition";
-                row.innerHTML = `
-                    <td class="py-4 px-5 font-bold text-brand-purple">${item.ref_id || 'REQ-' + (100 + item.id)}</td>
-                    <td class="py-4 px-5 font-semibold text-slate-900">${item.title}</td>
-                    <td class="py-4 px-5 text-xs text-slate-500">${item.department}</td>
-                    <td class="py-4 px-5">
-                        <input type="number" id="effort-${item.id}" value="${item.estimated_days || 1}" min="1" class="w-16 px-2 py-1 border rounded text-center text-xs font-bold">
-                    </td>
-                    <td class="py-4 px-5 font-semibold text-slate-800">${item.due_date || '-'}</td>
-                    <td class="py-4 px-5">
-                        <select id="status-${item.id}" class="text-xs font-semibold px-2.5 py-1.5 rounded border bg-slate-50">
-                            <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pending</option>
-                            <option value="in_progress" ${item.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
-                            <option value="completed" ${item.status === 'completed' ? 'selected' : ''}>Completed</option>
-                        </select>
-                    </td>
-                    <td class="py-4 px-5 text-right space-x-2">
-                        <button onclick="saveDemandChanges(${item.id})" class="text-xs bg-brand-purple hover:bg-brand-purple-hover text-white font-semibold px-3 py-1.5 rounded-lg">Save</button>
-                        <button onclick="deleteDemand(${item.id})" class="text-xs bg-red-100 hover:bg-red-200 text-red-600 font-semibold px-3 py-1.5 rounded-lg transition">Delete</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
+    // 2. إضافة طلب جديد
+    async function handleCreateDemand(e) {
+        e.preventDefault();
+        const title = document.getElementById('newTitle').value;
+        const department = document.getElementById('newDept').value;
+        const days = parseInt(document.getElementById('newDays').value);
+        const dueDate = calculateDueDate(days);
+
+        const { data, error } = await supabaseClient.from('demands').insert([{
+            title: title,
+            department: department,
+            estimated_days: days,
+            due_date: dueDate,
+            status: 'pending'
+        }]).select();
+
+        if (error) {
+            alert('Error adding demand: ' + error.message);
+            console.error(error);
+        } else {
+            const newId = data[0].id;
+            await supabaseClient.from('demands').update({ ref_id: 'REQ-' + (100 + newId) }).eq('id', newId);
+            
+            closeModal();
+            document.getElementById('createDemandForm').reset();
+            loadAdminDemands();
         }
+    }
 
-        // 2. إضافة طلب جديد
-        async function handleCreateDemand(e) {
-            e.preventDefault();
-            const title = document.getElementById('newTitle').value;
-            const department = document.getElementById('newDept').value;
-            const days = parseInt(document.getElementById('newDays').value);
-            const dueDate = calculateDueDate(days);
+    // 3. تعديل وتحديث الطلب
+    async function saveDemandChanges(id) {
+        const days = parseInt(document.getElementById(`effort-${id}`).value);
+        const status = document.getElementById(`status-${id}`).value;
+        const dueDate = calculateDueDate(days);
 
-            const { data, error } = await supabaseClient.from('demands').insert([{
-                title: title,
-                department: department,
-                estimated_days: days,
-                due_date: dueDate,
-                status: 'pending'
-            }]).select();
+        const { error } = await supabaseClient.from('demands').update({
+            estimated_days: days,
+            due_date: dueDate,
+            status: status
+        }).eq('id', id);
 
-            if (error) {
-                alert('Error adding demand: ' + error.message);
-                console.error(error);
-            } else {
-                const newId = data[0].id;
-                await supabaseClient.from('demands').update({ ref_id: 'REQ-' + (100 + newId) }).eq('id', newId);
-                
-                closeModal();
-                document.getElementById('createDemandForm').reset();
-                loadAdminDemands();
-            }
+        if (error) {
+            alert('Error updating: ' + error.message);
+        } else {
+            alert('Updated successfully!');
+            loadAdminDemands();
         }
+    }
 
-        // 3. تعديل وتحديث الطلب
-        async function saveDemandChanges(id) {
-            const days = parseInt(document.getElementById(`effort-${id}`).value);
-            const status = document.getElementById(`status-${id}`).value;
-            const dueDate = calculateDueDate(days);
+    // 4. حذف طلب متكامل
+    async function deleteDemand(id) {
+        if (!confirm('Are you sure you want to delete this demand?')) return;
 
-            const { error } = await supabaseClient.from('demands').update({
-                estimated_days: days,
-                due_date: dueDate,
-                status: status
-            }).eq('id', id);
+        const { error } = await supabaseClient.from('demands').delete().eq('id', id);
 
-            if (error) {
-                alert('Error updating: ' + error.message);
-            } else {
-                alert('Updated successfully!');
-                loadAdminDemands();
-            }
+        if (error) {
+            alert('Error deleting demand: ' + error.message);
+        } else {
+            loadAdminDemands();
         }
+    }
 
-        // 4. حذف طلب متكامل
-        async function deleteDemand(id) {
-            if (!confirm('Are you sure you want to delete this demand?')) return;
-
-            const { error } = await supabaseClient.from('demands').delete().eq('id', id);
-
-            if (error) {
-                alert('Error deleting demand: ' + error.message);
-            } else {
-                loadAdminDemands();
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', loadAdminDemands);
-    </script>
+    document.addEventListener('DOMContentLoaded', loadAdminDemands);
+</script>
 </body>
 </html>
