@@ -50,9 +50,9 @@
                 <h2 class="text-2xl font-bold text-slate-900">Project Demands Queue</h2>
                 <p class="text-xs text-slate-500 mt-1">Real-time status cards and estimated delivery timelines</p>
             </div>
+            <input type="text" id="publicSearchInput" oninput="filterPublicDemands()" placeholder="🔍 Search title, dept, or ID..." class="w-64 px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-purple shadow-sm">
             <button onclick="fetchPublicDemands()" class="text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-lg transition shadow-sm flex items-center space-x-1">
                 <!-- Search Input -->
-<input type="text" id="publicSearchInput" oninput="filterPublicDemands()" placeholder="🔍 Search title, dept, or ID..." class="w-64 px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-purple shadow-sm">
                 🔄 Refresh Board
             </button>
         </div>
