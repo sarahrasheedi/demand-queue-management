@@ -93,6 +93,9 @@ const SUPABASE_ANON_KEY = 'sb_publishable_zz8WbD9nkuKA070aTJBQDg_xpgcKq_D';
     const form = document.getElementById('loginForm');
     const alertBox = document.getElementById('alertBox');
 
+if (localStorage.getItem('isLoggedIn') === 'true') {
+    window.location.href = "admin.html";
+}
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -128,11 +131,14 @@ const SUPABASE_ANON_KEY = 'sb_publishable_zz8WbD9nkuKA070aTJBQDg_xpgcKq_D';
                 console.error("Auth Error:", authError);
                 showAlert("كلمة المرور غير صحيحة أو الحساب غير مفعل", "error");
             } else {
-                localStorage.setItem('userEmail', dev.email);
-                showAlert("تم التحقق بنجاح، جاري الانتقال...", "success");
-                setTimeout(() => {
-                    window.location.href = "admin.html";
-                }, 800);
+                
+localStorage.setItem('userEmail', dev.email);
+localStorage.setItem('isLoggedIn', 'true'); // ⬅️ أضيفي هذا السطر
+
+showAlert("تم التحقق بنجاح، جاري الانتقال...", "success");
+setTimeout(() => {
+    window.location.href = "admin.html";
+}, 800);
             }
 
         } catch (err) {
