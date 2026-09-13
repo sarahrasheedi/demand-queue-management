@@ -51,6 +51,8 @@
                 <p class="text-xs text-slate-500 mt-1">Real-time status cards and estimated delivery timelines</p>
             </div>
             <button onclick="fetchPublicDemands()" class="text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-lg transition shadow-sm flex items-center space-x-1">
+                <!-- Search Input -->
+<input type="text" id="publicSearchInput" oninput="filterPublicDemands()" placeholder="🔍 Search title, dept, or ID..." class="w-64 px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-purple shadow-sm">
                 🔄 Refresh Board
             </button>
         </div>
@@ -65,74 +67,34 @@
     </div>
 
     <script>
-        async function fetchPublicDemands() {
-            const grid = document.getElementById('cardsGrid');
-            
-            // جلب البيانات الحية من Supabase
-            const { data: demands, error } = await supabaseClient
-                .from('demands')
-                .select('*')
-                .order('id', { ascending: false });
+let publicDemandsList = []; // أضيفي هذا المتغير في بداية السكربت لتخزين البيانات
 
-            if (error) {
-                console.error("Error fetching demands:", error);
-                grid.innerHTML = `<div class="col-span-full text-center py-12 text-red-500 font-semibold">Error loading demands. Check browser console.</div>`;
-                return;
-            }
+async function fetchPublicDemands() {
+    const { data: demands, error } = await supabaseClient
+        .from('demands')
+        .select('*')
+        .order('id', { ascending: false });
 
-            if (!demands || demands.length === 0) {
-                grid.innerHTML = `
-                    <div class="col-span-full bg-white rounded-xl p-12 text-center border border-dashed border-slate-300 shadow-sm">
-                        <p class="text-slate-500 font-semibold text-base">No demands in the queue yet.</p>
-                        <p class="text-slate-400 text-xs mt-1">Add new demands from the Admin Portal to display them here.</p>
-                    </div>`;
-                return;
-            }
+    if (error) {
+        console.error("Error fetching demands:", error);
+        return;
+    }
 
-            grid.innerHTML = '';
-            demands.forEach(item => {
-                // تلوين تصميم شارة الحالة
-                let statusBadge = '';
-                if (item.status === 'completed') {
-                    statusBadge = `<span class="bg-emerald-100 text-emerald-700 font-bold text-xs px-3 py-1 rounded-full">Completed</span>`;
-                } else if (item.status === 'in_progress') {
-                    statusBadge = `<span class="bg-blue-100 text-blue-700 font-bold text-xs px-3 py-1 rounded-full">In Progress</span>`;
-                } else {
-                    statusBadge = `<span class="bg-amber-100 text-amber-700 font-bold text-xs px-3 py-1 rounded-full">Pending</span>`;
-                }
+    publicDemandsList = demands || []; // احفظي البيانات هنا
+    renderPublicCards(publicDemandsList);
+}
 
-                // كارت المربع لكل طلب
-                const card = document.createElement('div');
-                card.className = "bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-4";
-                card.innerHTML = `
-                    <div>
-                        <div class="flex justify-between items-start mb-3">
-                            <span class="text-xs font-bold text-brand-purple bg-brand-purple-light px-2.5 py-1 rounded-md">
-                                ${item.ref_id || 'REQ-' + (100 + item.id)}
-                            </span>
-                            ${statusBadge}
-                        </div>
-                        <h3 class="font-bold text-lg text-slate-900 leading-snug mb-1">${item.title}</h3>
-                        <p class="text-xs font-medium text-slate-500">🏢 Department: <span class="text-slate-700 font-semibold">${item.department}</span></p>
-                    </div>
-
-                    <div class="pt-4 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
-                        <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                            <span class="block text-slate-400 text-[10px] font-semibold uppercase">Estimated Effort</span>
-                            <span class="font-bold text-slate-800 text-sm">${item.estimated_days ? item.estimated_days + ' Days' : '-'}</span>
-                        </div>
-                        <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                            <span class="block text-slate-400 text-[10px] font-semibold uppercase">Due Date</span>
-                            <span class="font-bold text-slate-800 text-sm">${item.due_date || '-'}</span>
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
-        }
-
-        // تشغيل الجلب تلقائياً
-        document.addEventListener('DOMContentLoaded', fetchPublicDemands);
+// أضيفي هذه الدالة الجديدة بالكامل في أسفل السكربت:
+function filterPublicDemands() {
+    const query = document.getElementById('publicSearchInput').value.toLowerCase().trim();
+    const filtered = publicDemandsList.filter(item => {
+        const refId = (item.ref_id || 'REQ-' + (100 + item.id)).toLowerCase();
+        const title = (item.title || '').toLowerCase();
+        const dept = (item.department || '').toLowerCase();
+        return refId.includes(query) || title.includes(query) || dept.includes(query);
+    });
+    renderPublicCards(filtered);
+}
     </script>
 </body>
 </html>
