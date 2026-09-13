@@ -104,7 +104,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_zz8WbD9nkuKA070aTJBQDg_xpgcKq_D';
             const { data: dev, error: devError } = await supabaseClient
                 .from('authorized_developers')
                 .select('*')
-                .eq('email', email)
+                .ilike('email', email)
                 .maybeSingle();
 
             if (devError) {
