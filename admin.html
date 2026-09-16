@@ -34,9 +34,12 @@
     <!-- Navbar -->
     <nav class="bg-brand-dark text-white px-6 py-4 border-b border-brand-purple flex justify-between items-center">
         <span class="font-bold text-lg">Demand Queue — Admin Portal</span>
-        <button onclick="logout()" class="text-xs font-semibold bg-brand-coral hover:bg-brand-coral-hover px-3.5 py-1.5 rounded-lg transition">
-            Logout
-        </button>
+        <div class="flex items-center gap-4">
+            <span id="developerNameDisplay" class="text-xs font-semibold text-purple-200 bg-brand-purple/50 px-3 py-1.5 rounded-lg border border-purple-400/20">Loading profile...</span>
+            <button onclick="logout()" class="text-xs font-semibold bg-brand-coral hover:bg-brand-coral-hover px-3.5 py-1.5 rounded-lg transition">
+                Logout
+            </button>
+        </div>
     </nav>
 
     <!-- Content -->
@@ -68,8 +71,8 @@
                             <th class="py-3.5 px-5 font-semibold">Ref ID</th>
                             <th class="py-3.5 px-5 font-semibold">Demand / Task</th>
                             <th class="py-3.5 px-5 font-semibold">Process / Dept</th>
+                            <th class="py-3.5 px-5 font-semibold">Developer</th>
                             <th class="py-3.5 px-5 font-semibold">Est. Days</th>
-                            <th class="py-3.5 px-5 font-semibold">Calculated Due Date</th>
                             <th class="py-3.5 px-5 font-semibold">Status</th>
                             <th class="py-3.5 px-5 font-semibold text-right">Actions</th>
                         </tr>
@@ -84,7 +87,7 @@
         </div>
     </div>
 
-    <!-- Modal Form (إضافة طلب جديد) -->
+    <!-- Modal Form -->
     <div id="addModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
             <h3 class="font-bold text-lg text-slate-900">Add New Demand</h3>
@@ -125,8 +128,8 @@
 
 <script>
     let allDemands = [];
+    let currentDeveloperName = "Unassigned";
 
-    // قائمة الحالات السبع المعتمدة
     const STATUS_OPTIONS = [
         "New",
         "Requirement Gathering",
@@ -137,19 +140,17 @@
         "Live"
     ];
 
-    // التحقق من تسجيل الدخول
     if (localStorage.getItem('isLoggedIn') !== 'true') window.location.href = "login.html";
 
     function logout() {
+        supabaseClient.auth.signOut();
         localStorage.clear();
         window.location.href = "login.html";
     }
 
-    // Modal Controls
     function openModal() { document.getElementById('addModal').classList.remove('hidden'); document.getElementById('addModal').classList.add('flex'); }
     function closeModal() { document.getElementById('addModal').classList.add('hidden'); document.getElementById('addModal').classList.remove('flex'); }
 
-    // حساب تاريخ الاستحقاق
     function calculateDueDate(days) {
         if (!days || days <= 0) return null;
         const date = new Date();
@@ -157,7 +158,15 @@
         return date.toISOString().split('T')[0];
     }
 
-    // 1. جلب بيانات جدول الأدمن
+    // جلب ملف المستخدم واسمه
+    async function loadUserProfile() {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (user) {
+            currentDeveloperName = user.user_metadata?.full_name || user.email.split('@')[0];
+            document.getElementById('developerNameDisplay').innerText = `👤 Developer: ${currentDeveloperName}`;
+        }
+    }
+
     async function loadAdminDemands() {
         const { data: demands, error } = await supabaseClient.from('demands').select('*').order('id', { ascending: false });
         const tbody = document.getElementById('demandsTableBody');
@@ -172,7 +181,6 @@
         renderAdminTable(allDemands);
     }
 
-    // دالة رسم الصفوف
     function renderAdminTable(demands) {
         const tbody = document.getElementById('demandsTableBody');
 
@@ -187,7 +195,6 @@
             const row = document.createElement('tr');
             row.className = "hover:bg-slate-50 transition";
 
-            // بناء القائمة المنسدلة بالحالات السبع
             let statusOptionsHtml = STATUS_OPTIONS.map(opt => 
                 `<option value="${opt}" ${item.status === opt ? 'selected' : ''}>${opt}</option>`
             ).join('');
@@ -196,10 +203,10 @@
                 <td class="py-4 px-5 font-bold text-brand-purple">${formattedRefId}</td>
                 <td class="py-4 px-5 font-semibold text-slate-900">${item.title}</td>
                 <td class="py-4 px-5 text-xs text-slate-500">${item.department || 'General'}</td>
+                <td class="py-4 px-5 text-xs font-semibold text-brand-purple">${item.assigned_developer || 'Unassigned'}</td>
                 <td class="py-4 px-5">
                     <input type="number" id="effort-${item.id}" value="${item.estimated_days || 1}" min="1" class="w-16 px-2 py-1 border rounded text-center text-xs font-bold">
                 </td>
-                <td class="py-4 px-5 font-semibold text-slate-800">${item.due_date || '-'}</td>
                 <td class="py-4 px-5">
                     <select id="status-${item.id}" class="text-xs font-semibold px-2.5 py-1.5 rounded border bg-slate-50 focus:ring-2 focus:ring-brand-purple">
                         ${statusOptionsHtml}
@@ -214,22 +221,18 @@
         });
     }
 
-    // تصفية البحث
     function filterAdminDemands() {
         const query = document.getElementById('adminSearchInput').value.toLowerCase().trim();
-        
         const filtered = allDemands.filter(item => {
             const formattedRefId = (item.ref_id || 'REQ-' + String(item.id).padStart(3, '0')).toLowerCase();
             const title = (item.title || '').toLowerCase();
             const dept = (item.department || '').toLowerCase();
-            
-            return formattedRefId.includes(query) || title.includes(query) || dept.includes(query);
+            const dev = (item.assigned_developer || '').toLowerCase();
+            return formattedRefId.includes(query) || title.includes(query) || dept.includes(query) || dev.includes(query);
         });
-
         renderAdminTable(filtered);
     }
 
-    // 2. إضافة طلب جديد (إرسال department فقط)
     async function handleCreateDemand(e) {
         e.preventDefault();
         const title = document.getElementById('newTitle').value;
@@ -243,12 +246,12 @@
             department: department,
             estimated_days: days,
             due_date: dueDate,
-            status: status
+            status: status,
+            assigned_developer: currentDeveloperName
         }]).select();
 
         if (error) {
             alert('Error adding demand: ' + error.message);
-            console.error(error);
         } else {
             const newId = data[0].id;
             const refCode = 'REQ-' + String(newId).padStart(3, '0');
@@ -260,7 +263,6 @@
         }
     }
 
-    // 3. تعديل وتحديث الطلب
     async function saveDemandChanges(id) {
         const days = parseInt(document.getElementById(`effort-${id}`).value);
         const newStatus = document.getElementById(`status-${id}`).value;
@@ -269,32 +271,29 @@
         const { error } = await supabaseClient.from('demands').update({
             estimated_days: days,
             due_date: dueDate,
-            status: newStatus
+            status: newStatus,
+            assigned_developer: currentDeveloperName
         }).eq('id', id);
 
         if (error) {
             alert('Error updating status: ' + error.message);
-            console.error("Update error:", error);
         } else {
             alert('Updated successfully!');
             loadAdminDemands();
         }
     }
 
-    // 4. حذف الطلب
     async function deleteDemand(id) {
         if (!confirm('Are you sure you want to delete this demand?')) return;
-
         const { error } = await supabaseClient.from('demands').delete().eq('id', id);
-
-        if (error) {
-            alert('Error deleting demand: ' + error.message);
-        } else {
-            loadAdminDemands();
-        }
+        if (error) alert('Error deleting demand: ' + error.message);
+        else loadAdminDemands();
     }
 
-    document.addEventListener('DOMContentLoaded', loadAdminDemands);
+    document.addEventListener('DOMContentLoaded', () => {
+        loadUserProfile();
+        loadAdminDemands();
+    });
 </script>
 </body>
 </html>
