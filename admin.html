@@ -69,7 +69,7 @@
                             <th class="py-3.5 px-5 font-semibold">Demand / Task</th>
                             <th class="py-3.5 px-5 font-semibold">Process / Dept</th>
                             <th class="py-3.5 px-5 font-semibold">Est. Days</th>
-                            <th class="py-3.5 px-5 font-semibold">Due Date</th>
+                            <th class="py-3.5 px-5 font-semibold">Calculated Due Date</th>
                             <th class="py-3.5 px-5 font-semibold">Assigned Developer</th>
                             <th class="py-3.5 px-5 font-semibold">Status</th>
                             <th class="py-3.5 px-5 font-semibold text-right">Actions</th>
@@ -85,7 +85,7 @@
         </div>
     </div>
 
-    <!-- Modal Form -->
+    <!-- Modal Form (إضافة طلب جديد) -->
     <div id="addModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
             <h3 class="font-bold text-lg text-slate-900">Add New Demand</h3>
@@ -96,7 +96,7 @@
                     <input type="text" id="newTitle" required class="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-purple">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Process Name / Dept</label>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Process Name / Department</label>
                     <input type="text" id="newDept" required class="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-purple">
                 </div>
                 <div>
@@ -127,6 +127,7 @@
 <script>
     let allDemands = [];
 
+    // قائمة الحالات السبع المعتمدة
     const STATUS_OPTIONS = [
         "New",
         "Requirement Gathering",
@@ -137,6 +138,7 @@
         "Live"
     ];
 
+    // التحقق من تسجيل الدخول
     if (localStorage.getItem('isLoggedIn') !== 'true') window.location.href = "login.html";
     
     function getCurrentUser() {
@@ -148,9 +150,11 @@
         window.location.href = "login.html";
     }
 
+    // Modal Controls
     function openModal() { document.getElementById('addModal').classList.remove('hidden'); document.getElementById('addModal').classList.add('flex'); }
     function closeModal() { document.getElementById('addModal').classList.add('hidden'); document.getElementById('addModal').classList.remove('flex'); }
 
+    // حساب تاريخ الاستحقاق
     function calculateDueDate(days) {
         if (!days || days <= 0) return null;
         const date = new Date();
@@ -158,6 +162,7 @@
         return date.toISOString().split('T')[0];
     }
 
+    // 1. جلب بيانات جدول الأدمن
     async function loadAdminDemands() {
         const { data: demands, error } = await supabaseClient.from('demands').select('*').order('id', { ascending: false });
         const tbody = document.getElementById('demandsTableBody');
@@ -172,6 +177,7 @@
         renderAdminTable(allDemands);
     }
 
+    // دالة رسم الصفوف مع القائمة المنسدلة الحالات السبع
     function renderAdminTable(demands) {
         const tbody = document.getElementById('demandsTableBody');
 
@@ -186,6 +192,7 @@
             const row = document.createElement('tr');
             row.className = "hover:bg-slate-50 transition";
 
+            // بناء القائمة المنسدلة بالحالات السبع ديناميكياً
             let statusOptionsHtml = STATUS_OPTIONS.map(opt => 
                 `<option value="${opt}" ${item.status === opt ? 'selected' : ''}>${opt}</option>`
             ).join('');
@@ -215,6 +222,7 @@
         });
     }
 
+    // تصفية البحث
     function filterAdminDemands() {
         const query = document.getElementById('adminSearchInput').value.toLowerCase().trim();
         
@@ -230,6 +238,7 @@
         renderAdminTable(filtered);
     }
 
+    // 2. إضافة طلب جديد
     async function handleCreateDemand(e) {
         e.preventDefault();
         const title = document.getElementById('newTitle').value;
@@ -263,6 +272,7 @@
         }
     }
 
+    // 3. تعديل وتحديث الطلب
     async function saveDemandChanges(id) {
         const days = parseInt(document.getElementById(`effort-${id}`).value);
         const newStatus = document.getElementById(`status-${id}`).value;
@@ -280,11 +290,12 @@
             alert('Error updating status: ' + error.message);
             console.error("Update error:", error);
         } else {
-            alert('Status updated successfully!');
+            alert('Updated successfully!');
             loadAdminDemands();
         }
     }
 
+    // 4. حذف الطلب
     async function deleteDemand(id) {
         if (!confirm('Are you sure you want to delete this demand?')) return;
 
