@@ -1,13 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Supabase Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
     
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demand Queue — Live Dashboard</title>
+    <title>Demand Queue Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -26,200 +25,174 @@
         }
       }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <style> * { font-family: 'Cairo', sans-serif; } </style>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style> 
+        * { font-family: 'Cairo', sans-serif; } 
+        /* تخصيص شريط التمرير الأفقي والرأسي */
+        .custom-scroll::-webkit-scrollbar { height: 8px; width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; rounded: 8px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 </head>
-<body class="bg-slate-100 text-slate-800 flex flex-col min-h-screen">
+<body class="bg-slate-100 text-slate-800 flex flex-col h-screen overflow-hidden">
 
-    <!-- Header / Navbar -->
-    <nav class="bg-brand-dark text-white px-6 py-4 border-b border-brand-purple flex justify-between items-center shadow-md">
+    <!-- Top Navigation Bar -->
+    <nav class="bg-brand-dark text-white px-6 py-4 border-b border-brand-purple flex justify-between items-center shrink-0">
         <div class="flex items-center space-x-3">
-            <span class="font-bold text-xl tracking-wide">Demand Queue</span>
-            <span class="text-xs bg-brand-purple-light text-brand-purple px-2.5 py-1 rounded-full font-bold">Live Board</span>
+            <span class="font-bold text-lg tracking-wide">Demand Queue Dashboard</span>
         </div>
-        <a href="admin.html" class="text-xs font-semibold bg-brand-purple hover:bg-brand-purple-hover text-white px-4 py-2 rounded-lg transition shadow-sm">
-            ⚙️ Admin Portal
-        </a>
+        <div class="flex items-center space-x-3">
+            <!-- Search Input الشامل -->
+            <input 
+                type="text" 
+                id="publicSearchInput" 
+                oninput="filterBoardDemands()" 
+                placeholder="🔍 Search (Dev, Demand Name, REQ-ID, Process)..." 
+                class="w-80 px-3.5 py-2 border border-brand-purple/40 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-coral bg-white/10 text-white placeholder-slate-300"
+            >
+            
+            <a href="admin.html" class="text-xs font-semibold bg-brand-coral hover:bg-brand-coral/90 text-white px-4 py-2 rounded-lg transition shadow-sm">
+                Admin Portal
+            </a>
+        </div>
     </nav>
 
-    <!-- Main Container -->
-    <div class="max-w-7xl mx-auto px-4 py-8 w-full flex-grow">
-        
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-            <div>
-                <h2 class="text-2xl font-bold text-slate-900">Project Demands Queue</h2>
-                <p class="text-xs text-slate-500 mt-1">Real-time status cards, estimated durations, and scheduled delivery timelines</p>
-            </div>
-            
-            <div class="flex items-center space-x-3 w-full md:w-auto">
-                <input type="text" id="publicSearchInput" oninput="filterPublicDemands()" placeholder="🔍 Search title, dept, or ID..." class="w-full md:w-64 px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-purple shadow-sm">
-                <button onclick="loadPublicDemands()" class="text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-lg transition shadow-sm flex items-center shrink-0">
-                    🔄 Refresh Board
-                </button>
-            </div>
+    <!-- Main Board Area -->
+    <main class="flex-grow p-6 overflow-x-auto custom-scroll">
+        <div id="kanbanBoard" class="flex space-x-4 min-w-max h-full pb-4">
+            <!-- سيتم توليد أعمدة الحالات السبع ديناميكياً بواسطة JavaScript -->
         </div>
-
-        <!-- Demands Grid -->
-        <div id="cardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div class="col-span-full py-12 text-center text-slate-400">
-                Loading demands...
-            </div>
-        </div>
-
-    </div>
+    </main>
 
 <script>
-    let publicDemands = [];
+    let allDemands = [];
 
-    // 1. Fetch data from Supabase and apply priority sorting: In Progress -> Pending -> Completed
-    async function loadPublicDemands() {
-        const grid = document.getElementById('cardsGrid');
-        if (!grid) return;
+    // الحالات السبع المعتمدة مع ألوان الهيدر والبادجات لكل حالة
+    const STATUSES = [
+        { name: "New", color: "bg-blue-600" },
+        { name: "Requirement Gathering", color: "bg-amber-500" },
+        { name: "Solution Design", color: "bg-purple-600" },
+        { name: "Development", color: "bg-indigo-600" },
+        { name: "Testing", color: "bg-pink-600" },
+        { name: "Deployment", color: "bg-cyan-600" },
+        { name: "Live", color: "bg-emerald-600" }
+    ];
 
-        grid.innerHTML = `<div class="col-span-full py-12 text-center text-slate-400">Loading demands...</div>`;
-
+    // جلب البيانات مرتبة (الأحدث فوق والأقدم تحت)
+    async function fetchDemands() {
         const { data: demands, error } = await supabaseClient
             .from('demands')
-            .select('*');
+            .select('*')
+            .order('id', { ascending: false });
 
         if (error) {
-            console.error("Error fetching demands for dashboard:", error);
-            grid.innerHTML = `<div class="col-span-full text-center py-8 text-rose-500">Failed to load demands. Check console.</div>`;
+            console.error("Error fetching demands:", error);
             return;
         }
 
-        // Status weight mapping for priority sorting
-        const statusPriority = {
-            'in_progress': 1,
-            'قيد التنفيذ': 1,
-            'pending': 2,
-            'قيد الانتظار': 2,
-            'completed': 3,
-            'مكتمل': 3
-        };
-
-        const sortedDemands = (demands || []).sort((a, b) => {
-            const priorityA = statusPriority[(a.status || '').toLowerCase()] || 4;
-            const priorityB = statusPriority[(b.status || '').toLowerCase()] || 4;
-
-            // Priority 1: Sort by Status Weight
-            if (priorityA !== priorityB) {
-                return priorityA - priorityB;
-            }
-
-            // Priority 2: Sort by Due Date (Earliest first)
-            if (a.due_date && b.due_date) {
-                return new Date(a.due_date) - new Date(b.due_date);
-            }
-            if (a.due_date) return -1;
-            if (b.due_date) return 1;
-
-            // Priority 3: Fallback to ID
-            return b.id - a.id;
-        });
-
-        publicDemands = sortedDemands;
-        renderPublicBoard(publicDemands);
+        allDemands = demands || [];
+        renderKanbanBoard(allDemands);
     }
 
-    // 2. Render demand cards with top duration badge and bottom requester/due-date details
-    function renderPublicBoard(demands) {
-        const grid = document.getElementById('cardsGrid');
-        if (!grid) return;
+    // بناء اللوحة برمجياً
+    function renderKanbanBoard(demands) {
+        const boardContainer = document.getElementById('kanbanBoard');
+        boardContainer.innerHTML = '';
 
-        if (!demands || demands.length === 0) {
-            grid.innerHTML = `<div class="col-span-full text-center py-8 text-slate-400">No demands available.</div>`;
-            return;
-        }
+        STATUSES.forEach(statusConfig => {
+            const statusDemands = demands.filter(d => d.status === statusConfig.name);
 
-        grid.innerHTML = '';
-        demands.forEach(item => {
-            const card = document.createElement('div');
-            const isProgress = (item.status || '').toLowerCase() === 'in_progress' || (item.status || '') === 'قيد التنفيذ';
-            
-            card.className = `bg-white rounded-2xl border ${isProgress ? 'border-2 border-amber-400 shadow-md' : 'border-slate-200 shadow-sm'} hover:shadow-md transition overflow-hidden flex flex-col justify-between`;
-            
-            const refCode = item.ref_id || ('REQ-' + String(item.id).padStart(3, '0'));
-            const days = item.estimated_days || 1;
+            const columnEl = document.createElement('div');
+            columnEl.className = "w-80 bg-slate-200/70 rounded-xl flex flex-col max-h-full border border-slate-300/60 shadow-sm shrink-0";
 
-            card.innerHTML = `
-                <!-- Section 1: Header + Title + Top Duration Badge -->
-                <div class="p-5 pb-3">
-                    <div class="flex justify-between items-center mb-3">
-                        <div class="flex items-center space-x-2">
-                            <span class="text-xs font-extrabold text-brand-purple bg-brand-purple-light px-2.5 py-1 rounded-md">${refCode}</span>
-                            <span class="text-[11px] font-bold px-2.5 py-1 rounded-full ${getStatusStyle(item.status)}">
-                                ${formatStatus(item.status)}
-                            </span>
-                        </div>
-                        
-                        <!-- Estimated Duration Top Badge -->
-                        <div class="bg-slate-900 text-amber-300 px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 shadow-sm">
-                            <span>⏱️ ${days} ${days > 1 ? 'Days' : 'Day'}</span>
-                        </div>
+            columnEl.innerHTML = `
+                <div class="p-3.5 flex justify-between items-center border-b border-slate-300/80 bg-slate-100 rounded-t-xl shrink-0">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-3 h-3 rounded-full ${statusConfig.color}"></span>
+                        <h3 class="font-bold text-xs text-slate-800 uppercase tracking-wide">${statusConfig.name}</h3>
                     </div>
-
-                    <h3 class="font-bold text-slate-900 text-base leading-snug mb-1">${item.title || 'Untitled Demand'}</h3>
+                    <span class="text-xs font-bold bg-white text-slate-600 px-2.5 py-0.5 rounded-full border border-slate-200 shadow-xs">
+                        ${statusDemands.length}
+                    </span>
                 </div>
-
-                <!-- Section 2: Details Footer (Requester, Dept & Due Date) -->
-                <div class="bg-slate-50 px-5 py-3 border-t border-slate-100 space-y-2.5 text-xs text-slate-600">
-                    <div class="flex justify-between items-center">
-                        <span class="text-slate-400 font-medium">Department:</span>
-                        <span class="font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">${item.department || 'General'}</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60">
-                        <div>
-                            <span class="text-slate-400 block text-[10px]">Est. Duration:</span>
-                            <span class="font-bold text-slate-700">${days} Business ${days > 1 ? 'Days' : 'Day'}</span>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-slate-400 block text-[10px]">Target Due Date:</span>
-                            <span class="font-bold text-brand-purple">${item.due_date || 'N/A'}</span>
-                        </div>
-                    </div>
+                
+                <div class="p-3 space-y-3 overflow-y-auto custom-scroll flex-grow">
+                    ${statusDemands.length === 0 ? 
+                        `<div class="text-center py-8 text-xs text-slate-400 font-medium">No tasks</div>` : 
+                        statusDemands.map(item => createCardHtml(item)).join('')
+                    }
                 </div>
             `;
-            grid.appendChild(card);
+
+            boardContainer.appendChild(columnEl);
         });
     }
 
-    // 3. Search Filter
-    function filterPublicDemands() {
+    // تصميم كرت الطلب مع دعم إظهار البروسيس والديفيلوبر والرقم ورقم الطلب
+    function createCardHtml(item) {
+        const formattedRefId = item.ref_id || 'REQ-' + String(item.id).padStart(3, '0');
+        const processName = item.process_name || item.department || 'General Process';
+        const developerName = item.assigned_to || 'Unassigned';
+
+        return `
+            <div class="bg-white p-4 rounded-lg shadow-xs border border-slate-200 hover:shadow-md transition flex flex-col space-y-3">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-bold text-brand-purple bg-brand-purple-light px-2 py-0.5 rounded border border-brand-purple/10">
+                        ${formattedRefId}
+                    </span>
+                    <span class="text-[10px] font-semibold text-slate-400">
+                        Est: ${item.estimated_days || 1} d
+                    </span>
+                </div>
+
+                <!-- اسم الطلب (Demand Name) -->
+                <h4 class="font-bold text-sm text-slate-900 leading-snug break-words">
+                    ${item.title}
+                </h4>
+
+                <div class="flex justify-between items-center text-xs pt-1 border-t border-slate-100 text-slate-500">
+                    <!-- اسم البروسيس / القسم -->
+                    <span class="font-medium bg-slate-100 px-2 py-0.5 rounded text-slate-600 truncate max-w-[150px]" title="${processName}">
+                        ⚙️ ${processName}
+                    </span>
+                    <span class="text-[11px] font-semibold text-slate-500">
+                        🗓 ${item.due_date || 'No Date'}
+                    </span>
+                </div>
+
+                <!-- اسم الديفيلوبر / المسند إليه -->
+                <div class="pt-1 flex justify-between items-center text-[11px]">
+                    <span class="text-slate-400">Developer:</span>
+                    <span class="font-semibold text-brand-purple bg-brand-purple-light/50 px-2 py-0.5 rounded">
+                        👨‍💻 ${developerName}
+                    </span>
+                </div>
+            </div>
+        `;
+    }
+
+    // دالة الفلترة الشاملة
+    function filterBoardDemands() {
         const query = document.getElementById('publicSearchInput').value.toLowerCase().trim();
-        if (!query) {
-            renderPublicBoard(publicDemands);
-            return;
-        }
 
-        const filtered = publicDemands.filter(item => {
-            const title = (item.title || '').toLowerCase();
-            const dept = (item.department || '').toLowerCase();
-            const ref = (item.ref_id || 'REQ-' + item.id).toLowerCase();
-            
-            return title.includes(query) || dept.includes(query) || ref.includes(query);
+        const filtered = allDemands.filter(item => {
+            const formattedRefId = (item.ref_id || 'REQ-' + String(item.id).padStart(3, '0')).toLowerCase();
+            const title = (item.title || '').toLowerCase(); // اسم الديماند
+            const developer = (item.assigned_to || '').toLowerCase(); // اسم الديفيلوبر
+            const process = (item.process_name || item.department || '').toLowerCase(); // اسم البروسيس
+
+            // يبحث في أي من الحقول الأربعة
+            return formattedRefId.includes(query) || 
+                   title.includes(query) || 
+                   developer.includes(query) || 
+                   process.includes(query);
         });
 
-        renderPublicBoard(filtered);
+        renderKanbanBoard(filtered);
     }
 
-    // Status Badge Styling
-    function getStatusStyle(status) {
-        const st = (status || '').toLowerCase();
-        if (st === 'completed' || st === 'مكتمل') return 'bg-emerald-100 text-emerald-700';
-        if (st === 'in_progress' || st === 'قيد التنفيذ') return 'bg-amber-100 text-amber-800 flex items-center space-x-1';
-        return 'bg-slate-100 text-slate-600';
-    }
-
-    function formatStatus(status) {
-        const st = (status || '').toLowerCase();
-        if (st === 'completed' || st === 'مكتمل') return 'Completed';
-        if (st === 'in_progress' || st === 'قيد التنفيذ') return '<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse mr-1"></span> In Progress';
-        return 'Pending';
-    }
-
-    document.addEventListener('DOMContentLoaded', loadPublicDemands);
+    document.addEventListener('DOMContentLoaded', fetchDemands);
 </script>
 </body>
 </html>
