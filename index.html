@@ -58,7 +58,6 @@
         <!-- Controls Bar -->
         <div class="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             
-            <!-- Filter Tabs -->
             <div class="flex overflow-x-auto gap-1.5 pb-2 md:pb-0 custom-scrollbar" id="statusTabs">
                 <button onclick="filterByStatus('ALL', event)" class="status-tab active-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition bg-brand-purple text-white">All Requests</button>
                 <button onclick="filterByStatus('New', event)" class="status-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition bg-slate-100 text-slate-600 hover:bg-slate-200">New</button>
@@ -70,13 +69,11 @@
                 <button onclick="filterByStatus('Live', event)" class="status-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition bg-slate-100 text-slate-600 hover:bg-slate-200">Live</button>
             </div>
 
-            <!-- Search Input -->
             <div class="relative w-full md:w-72">
                 <input type="text" id="searchInput" oninput="handleSearch()" placeholder="🔍 Search demands..." class="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-purple shadow-sm">
             </div>
         </div>
 
-        <!-- Container for Demands Board / Grid -->
         <div id="demandsContainer" class="flex-grow">
             <div class="text-center py-12 text-slate-400">Loading demand queue...</div>
         </div>
@@ -106,7 +103,6 @@
         'Live': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-800' }
     };
 
-    // جلب البيانات من Supabase
     async function fetchPublicDemands() {
         const { data: demands, error } = await supabaseClient.from('demands').select('*').order('id', { ascending: false });
 
@@ -120,7 +116,6 @@
         applyFilters();
     }
 
-    // بناء الكرت الفردي
     function createCardElement(item) {
         const formattedRefId = item.ref_id || 'REQ-' + String(item.id).padStart(3, '0');
         const style = STATUS_STYLES[item.status] || { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200', badge: 'bg-slate-100 text-slate-800' };
@@ -130,7 +125,6 @@
         return `
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition p-4 flex flex-col justify-between space-y-3">
                 <div>
-                    <!-- Header: Ref & Status -->
                     <div class="flex justify-between items-start mb-2 gap-2">
                         <span class="text-xs font-bold text-brand-purple tracking-wide">${formattedRefId}</span>
                         <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${style.badge}">
@@ -138,15 +132,12 @@
                         </span>
                     </div>
 
-                    <!-- Title -->
                     <h3 class="font-bold text-slate-900 text-sm mb-1 leading-snug">${item.title}</h3>
                     <p class="text-xs text-slate-500 font-medium mb-2">${item.department || 'General'}</p>
                 </div>
 
-                <!-- Footer Details -->
                 <div class="pt-2 border-t border-slate-100 flex flex-col gap-1.5">
                     
-                    <!-- Estimated Effort -->
                     <div class="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-[11px] font-semibold text-slate-700 w-fit">
                         <svg class="w-3.5 h-3.5 text-brand-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -154,9 +145,13 @@
                         <span>Estimated Effort: <strong class="text-brand-purple font-bold">${daysCount} ${daysLabel}</strong></span>
                     </div>
 
-                    <!-- Due Date -->
                     <div class="flex justify-between items-center text-[10px] text-slate-500 mt-0.5">
-                        <span>Calculated Due Date:</span>
+                        <span>Developer:</span>
+                        <span class="font-bold text-slate-800">${item.assigned_developer || 'Unassigned'}</span>
+                    </div>
+
+                    <div class="flex justify-between items-center text-[10px] text-slate-500">
+                        <span>Due Date:</span>
                         <span class="font-bold text-slate-700">${item.due_date || 'TBD'}</span>
                     </div>
                 </div>
@@ -164,10 +159,8 @@
         `;
     }
 
-    // رسم اللوحة عند تفعيل ALL (عرض الأعمدة)
     function renderKanbanBoard(filteredDemands) {
         const container = document.getElementById('demandsContainer');
-        
         let columnsHtml = `<div class="flex gap-4 overflow-x-auto pb-6 items-start custom-scrollbar">`;
 
         STATUSES.forEach(status => {
@@ -176,7 +169,6 @@
 
             columnsHtml += `
                 <div class="w-80 flex-shrink-0 bg-slate-200/60 rounded-xl p-3 border border-slate-300/60 flex flex-col max-h-[calc(100vh-220px)]">
-                    <!-- Column Header -->
                     <div class="flex items-center justify-between pb-3 px-1">
                         <div class="flex items-center gap-2">
                             <span class="w-2.5 h-2.5 rounded-full ${style.badge.split(' ')[0]} border ${style.border}"></span>
@@ -185,7 +177,6 @@
                         <span class="text-xs font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">${itemsInStatus.length}</span>
                     </div>
 
-                    <!-- Column Cards List -->
                     <div class="space-y-3 overflow-y-auto pr-1 flex-grow custom-scrollbar">
                         ${itemsInStatus.length > 0 
                             ? itemsInStatus.map(item => createCardElement(item)).join('')
@@ -200,10 +191,8 @@
         container.innerHTML = columnsHtml;
     }
 
-    // رسم الشبكة عند تصفية حالة واحدة
     function renderSingleGrid(filteredDemands) {
         const container = document.getElementById('demandsContainer');
-
         if (!filteredDemands || filteredDemands.length === 0) {
             container.innerHTML = `<div class="text-center py-12 text-slate-400 font-medium">No demands found in this status.</div>`;
             return;
@@ -216,29 +205,19 @@
         `;
     }
 
-    // تصفية حسب الحالة
     function filterByStatus(status, evt) {
         currentFilter = status;
-        
         document.querySelectorAll('.status-tab').forEach(btn => {
             btn.className = "status-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition bg-slate-100 text-slate-600 hover:bg-slate-200";
         });
-
-        if (evt && evt.target) {
-            evt.target.className = "status-tab active-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition bg-brand-purple text-white";
-        }
-
+        if (evt && evt.target) evt.target.className = "status-tab active-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition bg-brand-purple text-white";
         applyFilters();
     }
 
-    // تصفية البحث
-    function handleSearch() {
-        applyFilters();
-    }
+    function handleSearch() { applyFilters(); }
 
     function applyFilters() {
         const query = document.getElementById('searchInput').value.toLowerCase().trim();
-
         let filtered = allDemands;
 
         if (query !== '') {
@@ -246,16 +225,13 @@
                 const ref = (item.ref_id || 'REQ-' + String(item.id).padStart(3, '0')).toLowerCase();
                 const title = (item.title || '').toLowerCase();
                 const dept = (item.department || '').toLowerCase();
-                return ref.includes(query) || title.includes(query) || dept.includes(query);
+                const dev = (item.assigned_developer || '').toLowerCase();
+                return ref.includes(query) || title.includes(query) || dept.includes(query) || dev.includes(query);
             });
         }
 
-        if (currentFilter === 'ALL') {
-            renderKanbanBoard(filtered);
-        } else {
-            const statusFiltered = filtered.filter(item => item.status === currentFilter);
-            renderSingleGrid(statusFiltered);
-        }
+        if (currentFilter === 'ALL') renderKanbanBoard(filtered);
+        else renderSingleGrid(filtered.filter(item => item.status === currentFilter));
     }
 
     document.addEventListener('DOMContentLoaded', fetchPublicDemands);
