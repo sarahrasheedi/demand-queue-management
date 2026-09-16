@@ -233,7 +233,13 @@
         if (currentFilter === 'ALL') renderKanbanBoard(filtered);
         else renderSingleGrid(filtered.filter(item => item.status === currentFilter));
     }
-
+// فحص ما إذا كان القادم عن طريق رابط دعوة أو تعيين كلمة مرور
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    // يتفقد نوع الحدث أو وجود التوكن في رابط الصفحة
+    if (event === 'PASSWORD_RECOVERY' || window.location.hash.includes('type=invite') || window.location.hash.includes('type=recovery')) {
+        window.location.href = 'reset-password.html' + window.location.hash;
+    }
+});
     document.addEventListener('DOMContentLoaded', fetchPublicDemands);
 </script>
 </body>
