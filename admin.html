@@ -44,7 +44,7 @@
         <div class="flex justify-between items-center mb-6">
             <div>
                 <h2 class="text-xl font-bold text-slate-900">Manage Demand Queue</h2>
-                <p class="text-xs text-slate-500 mt-1">Set effort estimation, update lifecycle status, or manage assigned team members</p>
+                <p class="text-xs text-slate-500 mt-1">Set effort estimation or update lifecycle status</p>
             </div>
             <div class="flex space-x-3 items-center">
                 <input type="text" id="adminSearchInput" oninput="filterAdminDemands()" placeholder="🔍 Search demands..." class="w-64 px-3.5 py-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-purple shadow-sm">
@@ -70,14 +70,13 @@
                             <th class="py-3.5 px-5 font-semibold">Process / Dept</th>
                             <th class="py-3.5 px-5 font-semibold">Est. Days</th>
                             <th class="py-3.5 px-5 font-semibold">Calculated Due Date</th>
-                            <th class="py-3.5 px-5 font-semibold">Assigned Developer</th>
                             <th class="py-3.5 px-5 font-semibold">Status</th>
                             <th class="py-3.5 px-5 font-semibold text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="demandsTableBody" class="divide-y divide-slate-100 text-slate-700">
                         <tr>
-                            <td colspan="8" class="py-6 text-center text-slate-400">Loading demands...</td>
+                            <td colspan="7" class="py-6 text-center text-slate-400">Loading demands...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -140,10 +139,6 @@
 
     // التحقق من تسجيل الدخول
     if (localStorage.getItem('isLoggedIn') !== 'true') window.location.href = "login.html";
-    
-    function getCurrentUser() {
-        return localStorage.getItem('userName') || localStorage.getItem('userEmail') || 'Admin';
-    }
 
     function logout() {
         localStorage.clear();
@@ -169,7 +164,7 @@
 
         if (error) {
             console.error("Error fetching demands:", error);
-            tbody.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-red-500">Error loading data. Check console.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-red-500">Error loading data. Check console.</td></tr>`;
             return;
         }
 
@@ -177,12 +172,12 @@
         renderAdminTable(allDemands);
     }
 
-    // دالة رسم الصفوف مع القائمة المنسدلة الحالات السبع
+    // دالة رسم الصفوف
     function renderAdminTable(demands) {
         const tbody = document.getElementById('demandsTableBody');
 
         if (!demands || demands.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-slate-400">No demands found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-400">No demands found.</td></tr>`;
             return;
         }
 
@@ -192,7 +187,7 @@
             const row = document.createElement('tr');
             row.className = "hover:bg-slate-50 transition";
 
-            // بناء القائمة المنسدلة بالحالات السبع ديناميكياً
+            // بناء القائمة المنسدلة بالحالات السبع
             let statusOptionsHtml = STATUS_OPTIONS.map(opt => 
                 `<option value="${opt}" ${item.status === opt ? 'selected' : ''}>${opt}</option>`
             ).join('');
@@ -205,9 +200,6 @@
                     <input type="number" id="effort-${item.id}" value="${item.estimated_days || 1}" min="1" class="w-16 px-2 py-1 border rounded text-center text-xs font-bold">
                 </td>
                 <td class="py-4 px-5 font-semibold text-slate-800">${item.due_date || '-'}</td>
-                <td class="py-4 px-5 text-xs font-bold text-brand-purple">
-                    <span class="bg-brand-purple-light px-2 py-1 rounded">${item.assigned_to || 'Unassigned'}</span>
-                </td>
                 <td class="py-4 px-5">
                     <select id="status-${item.id}" class="text-xs font-semibold px-2.5 py-1.5 rounded border bg-slate-50 focus:ring-2 focus:ring-brand-purple">
                         ${statusOptionsHtml}
@@ -230,9 +222,8 @@
             const formattedRefId = (item.ref_id || 'REQ-' + String(item.id).padStart(3, '0')).toLowerCase();
             const title = (item.title || '').toLowerCase();
             const dept = (item.process_name || item.department || '').toLowerCase();
-            const assigned = (item.assigned_to || '').toLowerCase();
             
-            return formattedRefId.includes(query) || title.includes(query) || dept.includes(query) || assigned.includes(query);
+            return formattedRefId.includes(query) || title.includes(query) || dept.includes(query);
         });
 
         renderAdminTable(filtered);
@@ -246,7 +237,6 @@
         const days = parseInt(document.getElementById('newDays').value);
         const status = document.getElementById('newStatus').value;
         const dueDate = calculateDueDate(days);
-        const currentUser = getCurrentUser();
 
         const { data, error } = await supabaseClient.from('demands').insert([{
             title: title,
@@ -254,8 +244,7 @@
             process_name: department,
             estimated_days: days,
             due_date: dueDate,
-            status: status,
-            assigned_to: currentUser
+            status: status
         }]).select();
 
         if (error) {
@@ -277,13 +266,11 @@
         const days = parseInt(document.getElementById(`effort-${id}`).value);
         const newStatus = document.getElementById(`status-${id}`).value;
         const dueDate = calculateDueDate(days);
-        const currentUser = getCurrentUser();
 
         const { error } = await supabaseClient.from('demands').update({
             estimated_days: days,
             due_date: dueDate,
-            status: newStatus,
-            assigned_to: currentUser
+            status: newStatus
         }).eq('id', id);
 
         if (error) {
