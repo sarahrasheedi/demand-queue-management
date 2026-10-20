@@ -87,7 +87,7 @@
         </div>
 
         <div id="demandsContainer" class="flex-grow">
-            <div class="text-center py-12 text-slate-400">Loading demand queue...</div>
+            <div class="text-center py-12 text-slate-400">Loading demand queue from SMAX...</div>
         </div>
     </main>
 
@@ -227,17 +227,48 @@
         }
     }
 
+
     async function fetchPublicDemands() {
-        const { data: demands, error } = await supabaseClient.from('demands').select('*').order('id', { ascending: false });
+        try {
+            const response = await fetch('');
+            
+            if (!response.ok) {
+                throw new Error('فشل الاتصال بالسيرفر الوسيط');
+            }
 
-        if (error) {
-            console.error("Error loading demands:", error);
-            document.getElementById('demandsContainer').innerHTML = `<div class="text-center py-12 text-red-500">Failed to load demands. Please refresh.</div>`;
-            return;
+            const result = await response.json();
+            const smaxItems = result.value || [];
+
+            allDemands = smaxItems.map((item, index) => ({
+                id: item.Id || (index + 1),
+                ref_id: `SMAX-${item.Id || (index + 1)}`,
+                title: item.DisplayLabel || 'طلب بدون عنوان',
+                status: item.Status || item.PhaseId || 'New',
+                priority: item.Priority || 'Medium',
+                department: item.Department || 'SMAX Integration',
+                requester: item.Requester || 'SMAX User',
+                assigned_developer: item.AssignedDeveloper || 'Unassigned',
+                estimated_days: item.EstimatedDays || 1,
+                created_at: item.CreatedDate || new Date().toISOString(),
+                due_date: item.DueDate || 'TBD'
+            }));
+
+            applyFilters();
+
+        } catch (error) {
+            console.warn("تعذر جلب البيانات من السيرفر الوسيط، يتم الجلب من Supabase احتياطياً:", error);
+            
+            const { data: demands, error: supError } = await supabaseClient.from('demands').select('*').order('id', { ascending: false });
+
+            if (supError) {
+                console.error("Error loading demands:", supError);
+                document.getElementById('demandsContainer').innerHTML = `<div class="text-center py-12 text-red-500">Failed to load demands from SMAX Proxy and Supabase.</div>`;
+                return;
+            }
+
+            allDemands = demands || [];
+            applyFilters();
         }
-
-        allDemands = demands || [];
-        applyFilters();
     }
 
     function createCardElement(item) {
