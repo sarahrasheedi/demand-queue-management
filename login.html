@@ -83,11 +83,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-    // 2. إعداد الاتصال (تأكدي من وضع بيانات مشروعكِ هنا)
+
     const SUPABASE_URL = 'https://bjdkwemzmqwbaouzizfh.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_zz8WbD9nkuKA070aTJBQDg_xpgcKq_D';
     
-    // اسم المتغير هنا هو supabaseClient
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const form = document.getElementById('loginForm');
@@ -103,7 +102,6 @@ if (localStorage.getItem('isLoggedIn') === 'true') {
         const password = document.getElementById('passwordInput').value;
 
         try {
-            // نستخدم نفس الاسم supabaseClient للتحقق من الجدول
             const { data: dev, error: devError } = await supabaseClient
                 .from('authorized_developers')
                 .select('*')
@@ -133,7 +131,7 @@ if (localStorage.getItem('isLoggedIn') === 'true') {
             } else {
                 
 localStorage.setItem('userEmail', dev.email);
-localStorage.setItem('isLoggedIn', 'true'); // ⬅️ أضيفي هذا السطر
+localStorage.setItem('isLoggedIn', 'true'); // k
 
 showAlert("تم التحقق بنجاح، جاري الانتقال...", "success");
 setTimeout(() => {
