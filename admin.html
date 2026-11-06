@@ -3,7 +3,10 @@
 <head>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
-    
+    <script src="auth.js"></script>
+    <script src="priority-scoring.js"></script>
+    <script src="priority-evaluate.js"></script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Portal - Demand Queue</title>
@@ -31,7 +34,6 @@
 </head>
 <body class="bg-slate-100 text-slate-800 flex flex-col min-h-screen">
 
-    <!-- Navbar -->
     <nav class="bg-brand-dark text-white px-6 py-4 border-b border-brand-purple flex justify-between items-center">
         <span class="font-bold text-lg">Demand Queue — Admin Portal</span>
         <div class="flex items-center gap-4">
@@ -42,7 +44,6 @@
         </div>
     </nav>
 
-    <!-- Content -->
     <div class="max-w-7xl mx-auto px-4 py-8 w-full flex-grow">
         <div class="flex justify-between items-center mb-6">
             <div>
@@ -62,7 +63,6 @@
             </div>
         </div>
 
-        <!-- Table -->
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm">
@@ -72,6 +72,7 @@
                             <th class="py-3.5 px-5 font-semibold">Demand</th>
                             <th class="py-3.5 px-5 font-semibold">Dept</th>
                             <th class="py-3.5 px-5 font-semibold">Developer</th>
+                            <th class="py-3.5 px-5 font-semibold">Priority</th>
                             <th class="py-3.5 px-5 font-semibold">Est. Days</th>
                             <th class="py-3.5 px-5 font-semibold">Status</th>
                             <th class="py-3.5 px-5 font-semibold text-right">Actions</th>
@@ -79,7 +80,7 @@
                     </thead>
                     <tbody id="demandsTableBody" class="divide-y divide-slate-100 text-slate-700">
                         <tr>
-                            <td colspan="7" class="py-6 text-center text-slate-400">Loading demands...</td>
+                            <td colspan="8" class="py-6 text-center text-slate-400">Loading demands...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -87,7 +88,6 @@
         </div>
     </div>
 
-    <!-- Modal Form -->
     <div id="addModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
             <h3 class="font-bold text-lg text-slate-900">Add New Demand</h3>
@@ -140,12 +140,13 @@
         "Live"
     ];
 
-    if (localStorage.getItem('isLoggedIn') !== 'true') window.location.href = "login.html";
-
-    function logout() {
-        supabaseClient.auth.signOut();
-        localStorage.clear();
-        window.location.href = "login.html";
+    async function requireEditor() {
+        const role = await requireRole();
+        if (role && role !== 'editor') {
+            window.location.href = 'index.html';
+            return false;
+        }
+        return role === 'editor';
     }
 
     function openModal() { document.getElementById('addModal').classList.remove('hidden'); document.getElementById('addModal').classList.add('flex'); }
@@ -158,7 +159,6 @@
         return date.toISOString().split('T')[0];
     }
 
-    // جلب ملف المستخدم واسمه
     async function loadUserProfile() {
         const { data: { user } } = await supabaseClient.auth.getUser();
         if (user) {
@@ -173,7 +173,7 @@
 
         if (error) {
             console.error("Error fetching demands:", error);
-            tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-red-500">Error loading data. Check console.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-red-500">Error loading data. Check console.</td></tr>`;
             return;
         }
 
@@ -181,11 +181,15 @@
         renderAdminTable(allDemands);
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
     function renderAdminTable(demands) {
         const tbody = document.getElementById('demandsTableBody');
 
         if (!demands || demands.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-400">No demands found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-slate-400">No demands found.</td></tr>`;
             return;
         }
 
@@ -199,20 +203,26 @@
                 `<option value="${opt}" ${item.status === opt ? 'selected' : ''}>${opt}</option>`
             ).join('');
 
+            const priorityCell = item.priority_score != null
+                ? `<span class="font-bold text-brand-purple">${escapeHtml(item.priority_score)}</span><span class="text-xs text-slate-400">/100</span>`
+                : `<span class="text-xs text-slate-400">Not evaluated</span>`;
+
             row.innerHTML = `
-                <td class="py-4 px-5 font-bold text-brand-purple">${formattedRefId}</td>
-                <td class="py-4 px-5 font-semibold text-slate-900">${item.title}</td>
-                <td class="py-4 px-5 text-xs text-slate-500">${item.department || 'General'}</td>
-                <td class="py-4 px-5 text-xs font-semibold text-brand-purple">${item.assigned_developer || 'Unassigned'}</td>
+                <td class="py-4 px-5 font-bold text-brand-purple">${escapeHtml(formattedRefId)}</td>
+                <td class="py-4 px-5 font-semibold text-slate-900">${escapeHtml(item.title)}</td>
+                <td class="py-4 px-5 text-xs text-slate-500">${escapeHtml(item.department || 'General')}</td>
+                <td class="py-4 px-5 text-xs font-semibold text-brand-purple">${escapeHtml(item.assigned_developer || 'Unassigned')}</td>
+                <td class="py-4 px-5 whitespace-nowrap">${priorityCell}</td>
                 <td class="py-4 px-5">
-                    <input type="number" id="effort-${item.id}" value="${item.estimated_days || 1}" min="1" class="w-16 px-2 py-1 border rounded text-center text-xs font-bold">
+                    <input type="number" id="effort-${item.id}" value="${escapeHtml(item.estimated_days || 1)}" min="1" class="w-16 px-2 py-1 border rounded text-center text-xs font-bold">
                 </td>
                 <td class="py-4 px-5">
                     <select id="status-${item.id}" class="text-xs font-semibold px-2.5 py-1.5 rounded border bg-slate-50 focus:ring-2 focus:ring-brand-purple">
                         ${statusOptionsHtml}
                     </select>
                 </td>
-                <td class="py-4 px-5 text-right space-x-2">
+                <td class="py-4 px-5 text-right space-x-2 whitespace-nowrap">
+                    <button onclick="evaluateDemand(${item.id})" class="text-xs bg-brand-purple-light hover:bg-purple-200 text-brand-purple font-semibold px-3 py-1.5 rounded-lg transition">Evaluate</button>
                     <button onclick="saveDemandChanges(${item.id})" class="text-xs bg-brand-purple hover:bg-brand-purple-hover text-white font-semibold px-3 py-1.5 rounded-lg">Save</button>
                     <button onclick="deleteDemand(${item.id})" class="text-xs bg-red-100 hover:bg-red-200 text-red-600 font-semibold px-3 py-1.5 rounded-lg transition">Delete</button>
                 </td>
@@ -283,6 +293,10 @@
         }
     }
 
+    function evaluateDemand(id) {
+        openEvaluateModal(allDemands.find(d => d.id === id), loadAdminDemands);
+    }
+
     async function deleteDemand(id) {
         if (!confirm('Are you sure you want to delete this demand?')) return;
         const { error } = await supabaseClient.from('demands').delete().eq('id', id);
@@ -290,7 +304,8 @@
         else loadAdminDemands();
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+        if (!await requireEditor()) return;
         loadUserProfile();
         loadAdminDemands();
     });
