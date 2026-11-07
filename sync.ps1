@@ -40,6 +40,7 @@ $statusField = Get-Setting 'SMAX_STATUS_FIELD' 'PhaseId'
 $assigneeField = Get-Setting 'SMAX_ASSIGNEE_FIELD' ''
 $appField = Get-Setting 'SMAX_APP_FIELD' ''
 $appName = Get-Setting 'SMAX_APP_NAME' 'General'
+$odataVersionSetting = Get-Setting 'ODATA_VERSION' ''
 $maxPages = 50
 
 $boardStatuses = @('New', 'Requirement Gathering', 'Solution Design', 'Development', 'Testing', 'Deployment', 'Live')
@@ -76,8 +77,80 @@ function Invoke-Json($uri, $method = 'GET', $headers = @{}, $body = $null) {
         if ($detail -and $detail.Length -gt 500) { $detail = $detail.Substring(0, 500) }
         throw "Request failed: $method $uri - $($_.Exception.Message) $detail"
     }
+    $script:lastResponseHeaders = $response.Headers
     $text = [Text.Encoding]::UTF8.GetString($response.RawContentStream.ToArray())
-    if ($text) { return $text | ConvertFrom-Json }
+    if (-not $text) { return }
+    $contentType = "$($response.Headers['Content-Type'])"
+    $script:lastWasXml = $contentType -match 'xml' -or $text.TrimStart().StartsWith('<')
+    try {
+        if ($script:lastWasXml) { return ConvertFrom-ODataXml $text }
+        return $text | ConvertFrom-Json
+    } catch {
+        $preview = ($text -replace '\s+', ' ').Trim()
+        if ($preview.Length -gt 300) { $preview = $preview.Substring(0, 300) + '...' }
+        $finalUrl = $response.BaseResponse.ResponseUri.AbsoluteUri
+        throw "Unreadable response: $method $uri`n  $($_.Exception.Message)`n  Status: $($response.StatusCode)  Content-Type: $contentType`n  Final URL: $finalUrl`n  Starts with: $preview"
+    }
+}
+
+function ConvertFrom-AtomEntry($entry) {
+    $obj = [ordered]@{}
+    $props = $entry.SelectSingleNode("*[local-name()='content']/*[local-name()='properties']")
+    if (-not $props) { $props = $entry.SelectSingleNode("*[local-name()='properties']") }
+    if ($props) {
+        foreach ($p in $props.ChildNodes) {
+            if ($p.NodeType -ne 'Element') { continue }
+            $isNull = $p.Attributes | Where-Object { $_.LocalName -eq 'null' -and $_.Value -eq 'true' }
+            $obj[$p.LocalName] = if ($isNull) { $null } else { $p.InnerText }
+        }
+    }
+    foreach ($link in $entry.SelectNodes("*[local-name()='link']")) {
+        $inline = $link.SelectSingleNode("*[local-name()='inline']")
+        if (-not $inline) { continue }
+        $name = $link.GetAttribute('title')
+        if (-not $name) { $name = ($link.GetAttribute('rel') -split '/')[-1] }
+        $innerFeed = $inline.SelectSingleNode("*[local-name()='feed']")
+        $innerEntries = if ($innerFeed) { $innerFeed.SelectNodes("*[local-name()='entry']") } else { $inline.SelectNodes("*[local-name()='entry']") }
+        $converted = @($innerEntries | ForEach-Object { ConvertFrom-AtomEntry $_ })
+        $obj[$name] = if ($innerFeed) { $converted } elseif ($converted.Count) { $converted[0] } else { $null }
+    }
+    return [pscustomobject]$obj
+}
+
+function ConvertFrom-ODataXml($text) {
+    $xml = New-Object System.Xml.XmlDocument
+    $xml.LoadXml($text)
+    $root = $xml.DocumentElement
+    switch ($root.LocalName) {
+        'feed' {
+            $entries = @($root.SelectNodes("*[local-name()='entry']") | ForEach-Object { ConvertFrom-AtomEntry $_ })
+            $next = $root.SelectSingleNode("*[local-name()='link'][@rel='next']")
+            return [pscustomobject]@{ value = $entries; '@odata.nextLink' = $(if ($next) { $next.GetAttribute('href') } else { $null }) }
+        }
+        'entry' { return [pscustomobject]@{ value = @(ConvertFrom-AtomEntry $root) } }
+        'service' {
+            $sets = @($root.SelectNodes("//*[local-name()='collection']") | ForEach-Object { $_.GetAttribute('href') })
+            return [pscustomobject]@{ value = @(); entitySets = $sets }
+        }
+        default { throw "Unexpected XML (root element '$($root.LocalName)')" }
+    }
+}
+
+function Get-ODataPage($data) {
+    if ($null -ne $data.d) {
+        if ($null -ne $data.d.results) { return @{ items = @($data.d.results); next = $data.d.__next } }
+        return @{ items = @($data.d); next = $null }
+    }
+    return @{ items = @($data.value); next = $data.'@odata.nextLink' }
+}
+
+function Get-ODataVersion {
+    if ($odataVersionSetting) { return $odataVersionSetting }
+    Invoke-Json ("$odataBaseUrl/$entity" + '?$top=1') 'GET' $smaxHeaders | Out-Null
+    $headers = $script:lastResponseHeaders
+    if ($headers['OData-Version']) { return '4' }
+    if ($headers['DataServiceVersion'] -or $script:lastWasXml) { return '2' }
+    return '4'
 }
 
 function ConvertTo-IsoDate($value) {
@@ -85,7 +158,12 @@ function ConvertTo-IsoDate($value) {
     if ("$value" -match '^\d+$') {
         return [DateTimeOffset]::FromUnixTimeMilliseconds([long]$value).UtcDateTime.ToString('o')
     }
-    try { return ([DateTime]$value).ToUniversalTime().ToString('o') } catch { return $null }
+    if ("$value" -match '^/Date\((-?\d+)') {
+        return [DateTimeOffset]::FromUnixTimeMilliseconds([long]$Matches[1]).UtcDateTime.ToString('o')
+    }
+    if ($value -is [DateTime]) { return $value.ToUniversalTime().ToString('o') }
+    $styles = [Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal
+    try { return [DateTime]::Parse("$value", [Globalization.CultureInfo]::InvariantCulture, $styles).ToString('o') } catch { return $null }
 }
 
 function Get-FieldValue($item, $path) {
@@ -100,44 +178,60 @@ function Get-FieldValue($item, $path) {
 }
 
 $smaxHeaders = @{
-    Accept        = 'application/json'
+    Accept        = 'application/json, application/atom+xml;q=0.9, application/xml;q=0.8'
     Authorization = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("$($envValues['ODATA_USER']):$($envValues['ODATA_PASS'])"))
 }
 
-function Get-FilterQuery {
+function Get-FilterQuery($version) {
     if (-not $filterKeyword) { return '' }
-    $filter = "contains(DisplayLabel,'$($filterKeyword.Replace("'", "''"))')"
+    $keyword = $filterKeyword.Replace("'", "''")
+    $filter = if ($version -eq '2') { "substringof('$keyword',DisplayLabel)" } else { "contains(DisplayLabel,'$keyword')" }
     return '&$filter=' + [Uri]::EscapeDataString($filter)
 }
 
 function Get-SmaxRequests {
+    $version = Get-ODataVersion
     $select = New-Object System.Collections.Generic.List[string]
     $expand = New-Object System.Collections.Generic.List[string]
     foreach ($field in @('Id', 'DisplayLabel', 'CreatedDate', $statusField, $assigneeField, $appField)) {
         if (-not $field) { continue }
         $parts = $field.Split('/', 2)
+        if ($parts.Count -eq 2 -and $version -eq '2') {
+            $select.Add($field)
+            if (-not $expand.Contains($parts[0])) { $expand.Add($parts[0]) }
+            continue
+        }
         if (-not $select.Contains($parts[0])) { $select.Add($parts[0]) }
         if ($parts.Count -eq 2) { $expand.Add("$($parts[0])(`$select=$($parts[1]))") }
     }
 
     $url = "$odataBaseUrl/$entity" + '?$select=' + ($select -join ',')
     if ($expand.Count) { $url += '&$expand=' + ($expand -join ',') }
-    $url += Get-FilterQuery
+    $url += Get-FilterQuery $version
 
     $items = New-Object System.Collections.ArrayList
     for ($page = 0; $url -and $page -lt $maxPages; $page++) {
-        $data = Invoke-Json $url 'GET' $smaxHeaders
-        foreach ($item in $data.value) { [void]$items.Add($item) }
+        $data = Get-ODataPage (Invoke-Json $url 'GET' $smaxHeaders)
+        foreach ($item in $data.items) { [void]$items.Add($item) }
 
-        $next = $data.'@odata.nextLink'
-        $url = if ($next) { ([Uri]::new([Uri]"$odataBaseUrl/", $next)).AbsoluteUri } else { $null }
+        $url = if ($data.next) { ([Uri]::new([Uri]"$odataBaseUrl/", $data.next)).AbsoluteUri } else { $null }
     }
     return $items
 }
 
 function Show-SmaxFields {
-    $data = Invoke-Json ("$odataBaseUrl/$entity" + '?$top=3' + (Get-FilterQuery)) 'GET' $smaxHeaders
-    $items = @($data.value)
+    try {
+        $service = Invoke-Json "$odataBaseUrl/" 'GET' $smaxHeaders
+        $sets = if ($service.entitySets) { $service.entitySets }
+                elseif ($service.d.EntitySets) { $service.d.EntitySets }
+                elseif ($service.value) { $service.value | ForEach-Object { if ($_.url) { $_.url } else { $_.name } } }
+        if ($sets) { Write-Output "Entities available (use one as SMAX_ENTITY): $($sets -join ', ')"; Write-Output '' }
+    } catch {}
+
+    $version = Get-ODataVersion
+    $data = Get-ODataPage (Invoke-Json ("$odataBaseUrl/$entity" + '?$top=3' + (Get-FilterQuery $version)) 'GET' $smaxHeaders)
+    $items = @($data.items)
+    Write-Output "OData version: $version"
     if (-not $items.Count) { Write-Output "No $entity records returned."; return }
 
     Write-Output "Fields on $entity (sample values from $($items.Count) records):"
