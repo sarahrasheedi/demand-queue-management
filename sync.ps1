@@ -17,10 +17,12 @@ function Read-EnvFile($path) {
 }
 
 $envValues = Read-EnvFile (Join-Path $PSScriptRoot '.env.local')
+$useLocalStorage = "$($envValues['STORAGE'])".Trim().ToLower() -eq 'local'
+if ($useLocalStorage) { . (Join-Path $PSScriptRoot 'local-store.ps1') }
 
 $required = @()
 if (-not ($Demo -or $RemoveDemo)) { $required += @('ODATA_BASE_URL', 'ODATA_USER', 'ODATA_PASS') }
-if (-not $Inspect) { $required += @('SUPABASE_URL', 'SUPABASE_SERVICE_KEY') }
+if (-not $Inspect -and -not $useLocalStorage) { $required += @('SUPABASE_URL', 'SUPABASE_SERVICE_KEY') }
 $missing = $required | Where-Object { -not $envValues[$_] }
 if ($missing) {
     Write-Error "Missing values in .env.local: $($missing -join ', ')"
@@ -41,6 +43,10 @@ $assigneeField = Get-Setting 'SMAX_ASSIGNEE_FIELD' ''
 $appField = Get-Setting 'SMAX_APP_FIELD' ''
 $appName = Get-Setting 'SMAX_APP_NAME' 'General'
 $odataVersionSetting = Get-Setting 'ODATA_VERSION' ''
+$createdField = Get-Setting 'SMAX_CREATED_FIELD' 'CreateTime'
+$customFilter = Get-Setting 'SMAX_FILTER' ''
+$personEntity = Get-Setting 'SMAX_PERSON_ENTITY' 'Person'
+$personNameField = Get-Setting 'SMAX_PERSON_NAME_FIELD' 'Name'
 $maxPages = 50
 
 $boardStatuses = @('New', 'Requirement Gathering', 'Solution Design', 'Development', 'Testing', 'Deployment', 'Live')
@@ -183,6 +189,7 @@ $smaxHeaders = @{
 }
 
 function Get-FilterQuery($version) {
+    if ($customFilter) { return '&$filter=' + [Uri]::EscapeDataString($customFilter) }
     if (-not $filterKeyword) { return '' }
     $keyword = $filterKeyword.Replace("'", "''")
     $filter = if ($version -eq '2') { "substringof('$keyword',DisplayLabel)" } else { "contains(DisplayLabel,'$keyword')" }
@@ -193,7 +200,7 @@ function Get-SmaxRequests {
     $version = Get-ODataVersion
     $select = New-Object System.Collections.Generic.List[string]
     $expand = New-Object System.Collections.Generic.List[string]
-    foreach ($field in @('Id', 'DisplayLabel', 'CreatedDate', $statusField, $assigneeField, $appField)) {
+    foreach ($field in @('Id', 'DisplayLabel', $createdField, $statusField, $assigneeField, $appField)) {
         if (-not $field) { continue }
         $parts = $field.Split('/', 2)
         if ($parts.Count -eq 2 -and $version -eq '2') {
@@ -219,6 +226,37 @@ function Get-SmaxRequests {
     return $items
 }
 
+function Get-PersonNames($ids) {
+    $names = @{}
+    $ids = @($ids | Where-Object { $_ } | ForEach-Object { "$_" } | Select-Object -Unique)
+    for ($i = 0; $i -lt $ids.Count; $i += 15) {
+        $chunk = $ids[$i..([Math]::Min($i + 14, $ids.Count - 1))]
+        $people = $null
+        foreach ($quote in @("'", '')) {
+            $filter = ($chunk | ForEach-Object { "Id eq $quote$($_.Replace("'", "''"))$quote" }) -join ' or '
+            $url = "$odataBaseUrl/$personEntity" + '?$select=Id,' + $personNameField + '&$filter=' + [Uri]::EscapeDataString($filter)
+            try { $people = (Get-ODataPage (Invoke-Json $url 'GET' $smaxHeaders)).items; break } catch { $lookupError = $_ }
+        }
+        if ($null -eq $people) {
+            Write-Warning "Could not look up names in $personEntity, showing IDs instead: $lookupError"
+            return $names
+        }
+        foreach ($person in $people) { $names["$($person.Id)"] = $person.$personNameField }
+    }
+    return $names
+}
+
+function Show-FieldValues($fields) {
+    $version = Get-ODataVersion
+    $url = "$odataBaseUrl/$entity" + '?$select=' + ($fields -join ',') + '&$top=500' + (Get-FilterQuery $version)
+    $items = @((Get-ODataPage (Invoke-Json $url 'GET' $smaxHeaders)).items)
+    Write-Output ''
+    foreach ($field in $fields) {
+        $groups = $items | Group-Object { "$($_.$field)" } | Sort-Object Count -Descending
+        Write-Output "Values of $field (in $($items.Count) records): $(($groups | ForEach-Object { "$($_.Name) ($($_.Count))" }) -join ', ')"
+    }
+}
+
 function Show-SmaxFields {
     try {
         $service = Invoke-Json "$odataBaseUrl/" 'GET' $smaxHeaders
@@ -242,6 +280,17 @@ function Show-SmaxFields {
         }
         Write-Output ("  {0,-30} {1}" -f $property.Name, ($samples -join ' | '))
     }
+
+    $statusFields = @('PhaseId', 'Status', $statusField) | Where-Object { $_ -and $items[0].PSObject.Properties[$_] } | Select-Object -Unique
+    if ($statusFields) { Show-FieldValues @($statusFields) }
+}
+
+function Save-Demands($rows) {
+    if (-not @($rows).Count) { return }
+    if ($useLocalStorage) { return Save-LocalSmaxRows $rows }
+    $headers = Get-SupabaseHeaders
+    $headers.Prefer = 'resolution=merge-duplicates,return=minimal'
+    Invoke-Json "$supabaseUrl/rest/v1/demands?on_conflict=smax_id" 'POST' $headers (ConvertTo-Json -InputObject @($rows) -Depth 5 -Compress) | Out-Null
 }
 
 function Get-SupabaseHeaders {
@@ -268,14 +317,13 @@ function Add-DemoDemands {
             assigned_developer = $samples[$i][1]
         }
     }
-    $headers = Get-SupabaseHeaders
-    $headers.Prefer = 'resolution=merge-duplicates,return=minimal'
-    Invoke-Json "$supabaseUrl/rest/v1/demands?on_conflict=smax_id" 'POST' $headers (ConvertTo-Json -InputObject @($rows) -Depth 5 -Compress) | Out-Null
+    Save-Demands @($rows)
     Write-Output "[DEMO] Added $(@($rows).Count) sample demands. Open index.html to see them. Remove with -RemoveDemo."
 }
 
 function Remove-DemoDemands {
-    Invoke-Json "$supabaseUrl/rest/v1/demands?smax_id=like.DEMO-*" 'DELETE' (Get-SupabaseHeaders) | Out-Null
+    if ($useLocalStorage) { Remove-LocalDemoRows }
+    else { Invoke-Json "$supabaseUrl/rest/v1/demands?smax_id=like.DEMO-*" 'DELETE' (Get-SupabaseHeaders) | Out-Null }
     Write-Output "[DEMO] Removed the sample demands."
 }
 
@@ -286,6 +334,10 @@ try {
 
     $smaxItems = @(Get-SmaxRequests | Where-Object { $_.Id })
     $unmapped = @{}
+    $personNames = @{}
+    if ($assigneeField -and -not $assigneeField.Contains('/')) {
+        $personNames = Get-PersonNames ($smaxItems | ForEach-Object { Get-FieldValue $_ $assigneeField })
+    }
 
     $rows = foreach ($item in $smaxItems) {
         $smaxId = [string]$item.Id
@@ -295,7 +347,7 @@ try {
             $status = 'New'
             if ($smaxStatus) { $unmapped["$smaxStatus"] = $true }
         }
-        $created = ConvertTo-IsoDate $item.CreatedDate
+        $created = ConvertTo-IsoDate (Get-FieldValue $item $createdField)
         $app = if ($appField) { Get-FieldValue $item $appField } else { $appName }
 
         $row = [ordered]@{
@@ -309,19 +361,17 @@ try {
         }
         if ($assigneeField) {
             $assignee = Get-FieldValue $item $assigneeField
+            if ($assignee -and $personNames.ContainsKey("$assignee")) { $assignee = $personNames["$assignee"] }
             $row.assigned_developer = if ($assignee) { "$assignee" } else { 'Unassigned' }
         }
         $row
     }
     $rows = @($rows)
 
-    if ($rows.Count) {
-        $headers = Get-SupabaseHeaders
-        $headers.Prefer = 'resolution=merge-duplicates,return=minimal'
-        Invoke-Json "$supabaseUrl/rest/v1/demands?on_conflict=smax_id" 'POST' $headers (ConvertTo-Json -InputObject $rows -Depth 5 -Compress) | Out-Null
-    }
+    Save-Demands $rows
 
-    Write-Output "[SYNC] $([DateTime]::Now.ToString('s')) - $($rows.Count) demands from SMAX"
+    $target = if ($useLocalStorage) { "saved to $localDataFile" } else { 'sent to Supabase' }
+    Write-Output "[SYNC] $([DateTime]::Now.ToString('s')) - $($rows.Count) demands from SMAX, $target"
     if ($unmapped.Count) {
         Write-Warning "These SMAX statuses have no board column and were put under New. Add them to SMAX_STATUS_MAP: $($unmapped.Keys -join ', ')"
     }

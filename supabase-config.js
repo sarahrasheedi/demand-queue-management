@@ -1,7 +1,11 @@
+const DATA_MODE = 'local';
+
 const SUPABASE_URL = 'https://YOUR-PROJECT-ID.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PASTE_HERE';
 
-const supabaseClient = supabase.createClient(
-    SUPABASE_URL.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, ''),
-    SUPABASE_ANON_KEY.trim()
-);
+const supabaseClient = DATA_MODE === 'local'
+    ? createLocalClient()
+    : supabase.createClient(
+        SUPABASE_URL.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, ''),
+        SUPABASE_ANON_KEY.trim()
+    );
