@@ -42,6 +42,7 @@ $statusField = Get-Setting 'SMAX_STATUS_FIELD' 'PhaseId'
 $assigneeField = Get-Setting 'SMAX_ASSIGNEE_FIELD' ''
 $appField = Get-Setting 'SMAX_APP_FIELD' ''
 $appName = Get-Setting 'SMAX_APP_NAME' 'General'
+$appKeywords = @((Get-Setting 'SMAX_APP_KEYWORDS' '').Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $odataVersionSetting = Get-Setting 'ODATA_VERSION' ''
 $createdField = Get-Setting 'SMAX_CREATED_FIELD' 'CreateTime'
 $customFilter = Get-Setting 'SMAX_FILTER' ''
@@ -308,9 +309,9 @@ function Get-SupabaseHeaders {
 
 function Add-DemoDemands {
     $samples = @(
-        @('New', 'Tahani', 'Rahabah'), @('Requirement Gathering', 'Moaid', 'Rahabah'),
-        @('Solution Design', 'Tahani', 'Portal'), @('Development', 'Moaid', 'Rahabah'),
-        @('Testing', 'Tahani', 'Portal'), @('Deployment', 'Unassigned', 'Rahabah'), @('Live', 'Moaid', 'Portal')
+        @('New', 'Tahani', 'Rhabah'), @('Requirement Gathering', 'Moaid', 'Rhabah'),
+        @('Solution Design', 'Tahani', 'Portal'), @('Development', 'Moaid', 'Rhabah'),
+        @('Testing', 'Tahani', 'Portal'), @('Deployment', 'Unassigned', 'Rhabah'), @('Live', 'Moaid', 'Portal')
     )
     $rows = for ($i = 0; $i -lt $samples.Count; $i++) {
         [ordered]@{
@@ -355,7 +356,9 @@ try {
             if ($smaxStatus) { $unmapped["$smaxStatus"] = $true }
         }
         $created = ConvertTo-IsoDate (Get-FieldValue $item $createdField)
-        $app = if ($appField) { Get-FieldValue $item $appField } else { $appName }
+        $app = if ($appField) { Get-FieldValue $item $appField } else { $null }
+        if (-not $app) { $app = $appKeywords | Where-Object { "$($item.DisplayLabel)" -like "*$_*" } | Select-Object -First 1 }
+        if (-not $app) { $app = $appName }
 
         $row = [ordered]@{
             smax_id     = $smaxId
