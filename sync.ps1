@@ -1,4 +1,4 @@
-param([switch]$Inspect, [switch]$Demo, [switch]$RemoveDemo)
+param([switch]$Inspect, [switch]$Demo, [switch]$RemoveDemo, [string]$Find)
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -9,7 +9,11 @@ function Read-EnvFile($path) {
     if (Test-Path $path) {
         foreach ($line in Get-Content -Path $path -Encoding UTF8) {
             if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$') {
-                $values[$Matches[1]] = $Matches[2].Trim().Trim('"').Trim("'")
+                $value = $Matches[2].Trim()
+                if ($value.Length -ge 2 -and $value[0] -eq $value[-1] -and '"', "'" -contains [string]$value[0]) {
+                    $value = $value.Substring(1, $value.Length - 2)
+                }
+                $values[$Matches[1]] = $value
             }
         }
     }
@@ -22,7 +26,7 @@ if ($useLocalStorage) { . (Join-Path $PSScriptRoot 'local-store.ps1') }
 
 $required = @()
 if (-not ($Demo -or $RemoveDemo)) { $required += @('ODATA_BASE_URL', 'ODATA_USER', 'ODATA_PASS') }
-if (-not $Inspect -and -not $useLocalStorage) { $required += @('SUPABASE_URL', 'SUPABASE_SERVICE_KEY') }
+if (-not $Inspect -and -not $Find -and -not $useLocalStorage) { $required += @('SUPABASE_URL', 'SUPABASE_SERVICE_KEY') }
 $missing = $required | Where-Object { -not $envValues[$_] }
 if ($missing) {
     Write-Error "Missing values in .env.local: $($missing -join ', ')"
@@ -49,6 +53,7 @@ $customFilter = Get-Setting 'SMAX_FILTER' ''
 $personEntity = Get-Setting 'SMAX_PERSON_ENTITY' 'Person'
 $personNameField = Get-Setting 'SMAX_PERSON_NAME_FIELD' 'Name'
 $maxRecords = [int](Get-Setting 'SMAX_MAX_RECORDS' '0')
+$statusSource = (Get-Setting 'SMAX_STATUS_SOURCE' 'smax').Trim().ToLower()
 $maxPages = 50
 
 $boardStatuses = @('New', 'Requirement Gathering', 'Solution Design', 'Development', 'Testing', 'Deployment', 'Live')
@@ -216,6 +221,7 @@ function Get-SmaxRequests {
 
     $url = "$odataBaseUrl/$entity" + '?$select=' + ($select -join ',')
     if ($expand.Count) { $url += '&$expand=' + ($expand -join ',') }
+    if ($createdField) { $url += '&$orderby=' + $createdField + ' desc' }
     if ($maxRecords -gt 0) { $url += '&$top=' + $maxRecords }
     $url += Get-FilterQuery $version
 
@@ -265,6 +271,32 @@ function Show-FieldValues($fields) {
     }
 }
 
+function Find-SmaxValue($text) {
+    $version = Get-ODataVersion
+    $url = "$odataBaseUrl/$entity" + '?$top=300'
+    if ($createdField) { $url += '&$orderby=' + $createdField + ' desc' }
+    $url += Get-FilterQuery $version
+    Write-Host "[FIND] Reading the newest 300 $entity records..."
+    $items = @((Get-ODataPage (Invoke-Json $url 'GET' $smaxHeaders)).items)
+    $hits = [ordered]@{}
+    foreach ($item in $items) {
+        foreach ($property in $item.PSObject.Properties) {
+            $value = "$($property.Value)"
+            if ($value -notlike "*$text*") { continue }
+            if (-not $hits.Contains($property.Name)) { $hits[$property.Name] = @{ count = 0; values = @{} } }
+            $hits[$property.Name].count++
+            $short = if ($value.Length -gt 60) { $value.Substring(0, 60) + '...' } else { $value }
+            $hits[$property.Name].values[$short] = $true
+        }
+    }
+    if (-not $hits.Count) { Write-Output "No field contains '$text' in the newest $($items.Count) $entity records."; return }
+    Write-Output "Fields containing '$text' (in $($items.Count) records):"
+    foreach ($name in $hits.Keys) {
+        $examples = @($hits[$name].values.Keys | Select-Object -First 3) -join ' | '
+        Write-Output ("  {0,-30} {1} records, e.g. {2}" -f $name, $hits[$name].count, $examples)
+    }
+}
+
 function Show-SmaxFields {
     try {
         $service = Invoke-Json "$odataBaseUrl/" 'GET' $smaxHeaders
@@ -291,6 +323,20 @@ function Show-SmaxFields {
 
     $statusFields = @('PhaseId', 'Status', $statusField) | Where-Object { $_ -and $items[0].PSObject.Properties[$_] } | Select-Object -Unique
     if ($statusFields) { Show-FieldValues @($statusFields) }
+}
+
+function Get-ExistingStatuses($smaxIds) {
+    $existing = @{}
+    if ($useLocalStorage) {
+        foreach ($row in (Read-LocalDemands)) { if ($row.smax_id) { $existing["$($row.smax_id)"] = $row.status } }
+        return $existing
+    }
+    for ($i = 0; $i -lt $smaxIds.Count; $i += 100) {
+        $chunk = ($smaxIds[$i..([Math]::Min($i + 99, $smaxIds.Count - 1))] | ForEach-Object { "`"$_`"" }) -join ','
+        $found = Invoke-Json "$supabaseUrl/rest/v1/demands?select=smax_id,status&smax_id=in.($([Uri]::EscapeDataString($chunk)))" 'GET' (Get-SupabaseHeaders)
+        foreach ($row in $found) { $existing["$($row.smax_id)"] = $row.status }
+    }
+    return $existing
 }
 
 function Save-Demands($rows) {
@@ -337,12 +383,17 @@ function Remove-DemoDemands {
 
 try {
     if ($Inspect) { Show-SmaxFields; exit 0 }
+    if ($Find) { Find-SmaxValue $Find; exit 0 }
     if ($Demo) { Add-DemoDemands; exit 0 }
     if ($RemoveDemo) { Remove-DemoDemands; exit 0 }
 
     $smaxItems = @(Get-SmaxRequests | Where-Object { $_.Id })
     $unmapped = @{}
     $personNames = @{}
+    $existingStatuses = @{}
+    if ($statusSource -eq 'local') {
+        $existingStatuses = Get-ExistingStatuses @($smaxItems | ForEach-Object { [string]$_.Id })
+    }
     if ($assigneeField -and -not $assigneeField.Contains('/')) {
         $personNames = Get-PersonNames ($smaxItems | ForEach-Object { Get-FieldValue $_ $assigneeField })
     }
@@ -351,9 +402,11 @@ try {
         $smaxId = [string]$item.Id
         $smaxStatus = Get-FieldValue $item $statusField
         $status = $statusMap[(Get-Key $smaxStatus)]
-        if (-not $status) {
+        if ($statusSource -eq 'local' -and $existingStatuses.ContainsKey($smaxId)) {
+            $status = $existingStatuses[$smaxId]
+        } elseif (-not $status) {
             $status = 'New'
-            if ($smaxStatus) { $unmapped["$smaxStatus"] = $true }
+            if ($smaxStatus -and $statusSource -ne 'local') { $unmapped["$smaxStatus"] = $true }
         }
         $created = ConvertTo-IsoDate (Get-FieldValue $item $createdField)
         $app = if ($appField) { Get-FieldValue $item $appField } else { $null }
