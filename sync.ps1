@@ -1,4 +1,4 @@
-param([switch]$Inspect, [switch]$Demo, [switch]$RemoveDemo, [string]$Find)
+param([switch]$Inspect, [switch]$Demo, [switch]$RemoveDemo, [string]$Find, [string]$Entity)
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -40,7 +40,7 @@ function Get-Setting($name, $default) {
 $odataBaseUrl = "$($envValues['ODATA_BASE_URL'])".TrimEnd('/')
 $supabaseUrl = "$($envValues['SUPABASE_URL'])".TrimEnd('/')
 $supabaseKey = $envValues['SUPABASE_SERVICE_KEY']
-$entity = Get-Setting 'SMAX_ENTITY' 'Request'
+$entity = if ($Entity) { $Entity } else { Get-Setting 'SMAX_ENTITY' 'Request' }
 $filterKeyword = Get-Setting 'SMAX_FILTER_KEYWORD' ''
 $statusField = Get-Setting 'SMAX_STATUS_FIELD' 'PhaseId'
 $assigneeField = Get-Setting 'SMAX_ASSIGNEE_FIELD' ''
@@ -53,6 +53,7 @@ $customFilter = Get-Setting 'SMAX_FILTER' ''
 $personEntity = Get-Setting 'SMAX_PERSON_ENTITY' 'Person'
 $personNameField = Get-Setting 'SMAX_PERSON_NAME_FIELD' 'Name'
 $maxRecords = [int](Get-Setting 'SMAX_MAX_RECORDS' '0')
+$sinceDays = [int](Get-Setting 'SMAX_SINCE_DAYS' '0')
 $statusSource = (Get-Setting 'SMAX_STATUS_SOURCE' 'smax').Trim().ToLower()
 $maxPages = 50
 
@@ -195,12 +196,35 @@ $smaxHeaders = @{
     Authorization = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("$($envValues['ODATA_USER']):$($envValues['ODATA_PASS'])"))
 }
 
+function Get-SinceFilter($version) {
+    if ($sinceDays -le 0 -or -not $createdField) { return '' }
+    if ($null -ne $script:sinceFilter) { return $script:sinceFilter }
+    $since = [DateTime]::UtcNow.Date.AddDays(-$sinceDays)
+    $sampleUrl = "$odataBaseUrl/$entity" + '?$select=' + $createdField + '&$top=1'
+    $sample = @((Get-ODataPage (Invoke-Json $sampleUrl 'GET' $smaxHeaders)).items) | Select-Object -First 1
+    $sampleValue = if ($sample) { "$($sample.$createdField)" } else { '' }
+    $script:sinceFilter = if ($sampleValue -match '^\d+$') {
+        "$createdField ge $(([DateTimeOffset]$since).ToUnixTimeMilliseconds())"
+    } elseif ($version -eq '2') {
+        "$createdField ge datetime'$($since.ToString('yyyy-MM-ddTHH:mm:ss'))'"
+    } else {
+        "$createdField ge $($since.ToString('yyyy-MM-ddTHH:mm:ssZ'))"
+    }
+    Write-Host "[SYNC] Only records created since $($since.ToString('yyyy-MM-dd'))"
+    return $script:sinceFilter
+}
+
 function Get-FilterQuery($version) {
-    if ($customFilter) { return '&$filter=' + [Uri]::EscapeDataString($customFilter) }
-    if (-not $filterKeyword) { return '' }
-    $keyword = $filterKeyword.Replace("'", "''")
-    $filter = if ($version -eq '2') { "substringof('$keyword',DisplayLabel)" } else { "contains(DisplayLabel,'$keyword')" }
-    return '&$filter=' + [Uri]::EscapeDataString($filter)
+    $parts = @()
+    if ($customFilter) { $parts += "($customFilter)" }
+    elseif ($filterKeyword) {
+        $keyword = $filterKeyword.Replace("'", "''")
+        $parts += if ($version -eq '2') { "substringof('$keyword',DisplayLabel)" } else { "contains(DisplayLabel,'$keyword')" }
+    }
+    $since = Get-SinceFilter $version
+    if ($since) { $parts += $since }
+    if (-not $parts.Count) { return '' }
+    return '&$filter=' + [Uri]::EscapeDataString($parts -join ' and ')
 }
 
 function Get-SmaxRequests {
@@ -277,7 +301,11 @@ function Find-SmaxValue($text) {
     if ($createdField) { $url += '&$orderby=' + $createdField + ' desc' }
     $url += Get-FilterQuery $version
     Write-Host "[FIND] Reading the newest 300 $entity records..."
-    $items = @((Get-ODataPage (Invoke-Json $url 'GET' $smaxHeaders)).items)
+    try { $items = @((Get-ODataPage (Invoke-Json $url 'GET' $smaxHeaders)).items) }
+    catch {
+        Write-Host "[FIND] Sorting by $createdField failed on $entity, trying without it..."
+        $items = @((Get-ODataPage (Invoke-Json ("$odataBaseUrl/$entity" + '?$top=300' + (Get-FilterQuery $version)) 'GET' $smaxHeaders)).items)
+    }
     $hits = [ordered]@{}
     foreach ($item in $items) {
         foreach ($property in $item.PSObject.Properties) {
