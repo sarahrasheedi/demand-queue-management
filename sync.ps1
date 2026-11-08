@@ -47,6 +47,7 @@ $createdField = Get-Setting 'SMAX_CREATED_FIELD' 'CreateTime'
 $customFilter = Get-Setting 'SMAX_FILTER' ''
 $personEntity = Get-Setting 'SMAX_PERSON_ENTITY' 'Person'
 $personNameField = Get-Setting 'SMAX_PERSON_NAME_FIELD' 'Name'
+$maxRecords = [int](Get-Setting 'SMAX_MAX_RECORDS' '0')
 $maxPages = 50
 
 $boardStatuses = @('New', 'Requirement Gathering', 'Solution Design', 'Development', 'Testing', 'Deployment', 'Live')
@@ -214,21 +215,27 @@ function Get-SmaxRequests {
 
     $url = "$odataBaseUrl/$entity" + '?$select=' + ($select -join ',')
     if ($expand.Count) { $url += '&$expand=' + ($expand -join ',') }
+    if ($maxRecords -gt 0) { $url += '&$top=' + $maxRecords }
     $url += Get-FilterQuery $version
 
     $items = New-Object System.Collections.ArrayList
     for ($page = 0; $url -and $page -lt $maxPages; $page++) {
+        Write-Host "[SYNC] Reading page $($page + 1) from SMAX..."
         $data = Get-ODataPage (Invoke-Json $url 'GET' $smaxHeaders)
         foreach ($item in $data.items) { [void]$items.Add($item) }
+        Write-Host "[SYNC] $($items.Count) records so far"
 
+        if ($maxRecords -gt 0 -and $items.Count -ge $maxRecords) { break }
         $url = if ($data.next) { ([Uri]::new([Uri]"$odataBaseUrl/", $data.next)).AbsoluteUri } else { $null }
     }
+    if ($url -and $page -ge $maxPages) { Write-Warning "Stopped after $maxPages pages. Narrow it down with SMAX_FILTER." }
     return $items
 }
 
 function Get-PersonNames($ids) {
     $names = @{}
     $ids = @($ids | Where-Object { $_ } | ForEach-Object { "$_" } | Select-Object -Unique)
+    if ($ids.Count) { Write-Host "[SYNC] Looking up $($ids.Count) assignee names..." }
     for ($i = 0; $i -lt $ids.Count; $i += 15) {
         $chunk = $ids[$i..([Math]::Min($i + 14, $ids.Count - 1))]
         $people = $null
