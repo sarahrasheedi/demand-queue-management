@@ -20,10 +20,11 @@
               brand: {
                 purple: '#4f008c',
                 'purple-hover': '#3d006d',
-                'purple-light': '#f3e8ff',
-                coral: '#f84362',
-                'coral-hover': '#e03250',
-                dark: '#2d0050'
+                'purple-light': '#f3e6fa',
+                coral: '#ff375e',
+                'coral-hover': '#e62e53',
+                'coral-light': '#ffebef',
+                dark: '#3a0066'
               }
             }
           }
@@ -47,7 +48,7 @@
                 <h1 class="text-2xl font-bold tracking-tight">Demand Queue Lifecycle</h1>
             </div>
             <div id="authHeaderArea">
-                <a href="login.html" id="loginBtn" class="text-xs font-semibold bg-brand-purple hover:bg-brand-purple-hover text-white px-4 py-2.5 rounded-lg border border-purple-400/30 transition shadow-sm">
+                <a href="login.html" id="loginBtn" class="text-xs font-semibold bg-brand-purple hover:bg-brand-purple-hover text-white px-4 py-2.5 rounded-lg border border-white/20 transition shadow-sm">
                     Admin Portal Login
                 </a>
             </div>
@@ -96,7 +97,7 @@
             <div class="bg-brand-dark px-6 py-4 flex justify-between items-center text-white">
                 <h3 class="font-bold text-base flex items-center gap-2">
                     <span>Edit Demand Details</span>
-                    <span id="modalRefId" class="text-xs font-normal text-purple-200 bg-brand-purple px-2 py-0.5 rounded-md"></span>
+                    <span id="modalRefId" class="text-xs font-normal text-white/80 bg-brand-purple px-2 py-0.5 rounded-md"></span>
                 </h3>
                 <button onclick="closeEditModal()" class="text-slate-300 hover:text-white font-bold text-lg">&times;</button>
             </div>
@@ -193,20 +194,13 @@
     ];
 
     const STATUS_STYLES = {
-        'New': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-800' },
-        'Requirement Gathering': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-800' },
-        'Solution Design': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-800' },
-        'Development': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', badge: 'bg-indigo-100 text-indigo-800' },
-        'Testing': { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-800' },
-        'Deployment': { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', badge: 'bg-teal-100 text-teal-800' },
-        'Live': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-800' }
-    };
-
-    const PRIORITY_STYLES = {
-        'Low': 'bg-slate-100 text-slate-700 border-slate-200',
-        'Medium': 'bg-blue-50 text-blue-700 border-blue-200',
-        'High': 'bg-orange-50 text-orange-700 border-orange-200',
-        'Critical': 'bg-red-50 text-red-700 border-red-200'
+        'New': { dot: 'bg-brand-coral', badge: 'bg-brand-coral-light text-brand-coral' },
+        'Requirement Gathering': { dot: 'bg-brand-purple', badge: 'bg-brand-purple-light text-brand-purple' },
+        'Solution Design': { dot: 'bg-brand-coral', badge: 'bg-brand-coral-light text-brand-coral' },
+        'Development': { dot: 'bg-brand-purple', badge: 'bg-brand-purple-light text-brand-purple' },
+        'Testing': { dot: 'bg-brand-coral', badge: 'bg-brand-coral-light text-brand-coral' },
+        'Deployment': { dot: 'bg-brand-purple', badge: 'bg-brand-purple-light text-brand-purple' },
+        'Live': { dot: 'bg-brand-purple', badge: 'bg-brand-purple text-white' }
     };
 
     async function checkAdminAuth() {
@@ -215,12 +209,12 @@
 
         isAdminLoggedIn = role === 'editor';
         const adminLink = isAdminLoggedIn ? `
-            <a href="admin.html" class="text-xs font-semibold bg-brand-purple hover:bg-brand-purple-hover text-white px-3 py-1.5 rounded-lg border border-purple-400/30 transition">
+            <a href="admin.html" class="text-xs font-semibold bg-brand-purple hover:bg-brand-purple-hover text-white px-3 py-1.5 rounded-lg border border-white/20 transition">
                 Admin Dashboard
             </a>` : '';
         document.getElementById('authHeaderArea').innerHTML = `
             <div class="flex items-center gap-3">
-                <span class="text-xs text-purple-200 font-medium">Logged in as ${isAdminLoggedIn ? 'Editor' : 'Viewer'}</span>
+                <span class="text-xs text-white/80 font-medium">Logged in as ${isAdminLoggedIn ? 'Editor' : 'Viewer'}</span>
                 ${adminLink}
                 <button onclick="logout()" class="text-xs font-semibold bg-brand-coral hover:bg-brand-coral-hover text-white px-3 py-1.5 rounded-lg transition">
                     Logout
@@ -239,7 +233,7 @@
 
         if (error) {
             console.error("Error loading demands:", error);
-            document.getElementById('demandsContainer').innerHTML = `<div class="text-center py-12 text-red-500">Failed to load demands.</div>`;
+            document.getElementById('demandsContainer').innerHTML = `<div class="text-center py-12 text-brand-coral">Failed to load demands.</div>`;
             return;
         }
 
@@ -249,10 +243,10 @@
 
     function createCardElement(item) {
         const formattedRefId = item.ref_id || 'REQ-' + String(item.id).padStart(3, '0');
-        const style = STATUS_STYLES[item.status] || { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200', badge: 'bg-slate-100 text-slate-800' };
+        const style = STATUS_STYLES[item.status] || { dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-800' };
         const isEvaluated = item.priority_score != null;
         const priorityStyle = isEvaluated
-            ? 'bg-purple-50 text-brand-purple border-purple-200'
+            ? 'bg-brand-purple-light text-brand-purple border-brand-purple/20'
             : 'bg-white text-slate-400 border-dashed border-slate-300';
         const priorityLabel = isEvaluated ? `${item.priority_score} / 100` : 'Not evaluated';
         const daysCount = item.estimated_days || 1;
@@ -374,28 +368,25 @@
         await fetchPublicDemands();
     }
 
-    function renderKanbanBoard(filteredDemands) {
+    function renderColumns(columns) {
         const container = document.getElementById('demandsContainer');
         let columnsHtml = `<div class="flex gap-4 overflow-x-auto pb-6 items-start custom-scrollbar">`;
 
-        STATUSES.forEach(status => {
-            const itemsInStatus = filteredDemands.filter(d => d.status === status);
-            const style = STATUS_STYLES[status];
-
+        columns.forEach(column => {
             columnsHtml += `
                 <div class="w-80 flex-shrink-0 bg-slate-200/60 rounded-xl p-3 border border-slate-300/60 flex flex-col max-h-[calc(100vh-220px)]">
                     <div class="flex items-center justify-between pb-3 px-1">
                         <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full ${style.badge.split(' ')[0]} border ${style.border}"></span>
-                            <h3 class="font-bold text-xs text-slate-800 uppercase tracking-wider">${status}</h3>
+                            <span class="w-2.5 h-2.5 rounded-full ${column.dot}"></span>
+                            <h3 class="font-bold text-xs text-slate-800 uppercase tracking-wider">${escapeHtml(column.title)}</h3>
                         </div>
-                        <span class="text-xs font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">${itemsInStatus.length}</span>
+                        <span class="text-xs font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">${column.items.length}</span>
                     </div>
 
                     <div class="space-y-3 overflow-y-auto pr-1 flex-grow custom-scrollbar">
-                        ${itemsInStatus.length > 0 
-                            ? itemsInStatus.map(item => createCardElement(item)).join('')
-                            : `<div class="bg-white/50 border border-dashed border-slate-300 rounded-lg p-6 text-center text-xs text-slate-400">No requests in this status</div>`
+                        ${column.items.length > 0
+                            ? column.items.map(item => createCardElement(item)).join('')
+                            : `<div class="bg-white/50 border border-dashed border-slate-300 rounded-lg p-6 text-center text-xs text-slate-400">${escapeHtml(column.emptyText)}</div>`
                         }
                     </div>
                 </div>
@@ -406,52 +397,37 @@
         container.innerHTML = columnsHtml;
     }
 
+    function renderKanbanBoard(filteredDemands) {
+        renderColumns(STATUSES.map(status => ({
+            title: status,
+            dot: STATUS_STYLES[status].dot,
+            items: filteredDemands.filter(d => d.status === status),
+            emptyText: 'No requests in this status'
+        })));
+    }
+
     function renderDeveloperGroupedBoard(filteredDemands) {
-        const container = document.getElementById('demandsContainer');
-        
         let developersList = ['Tahani', 'Moaid'];
         const extraDevs = Array.from(new Set(allDemands.map(d => d.assigned_developer).filter(Boolean)));
-        
+
         extraDevs.forEach(dev => {
             if (!developersList.some(d => d.toLowerCase() === dev.toLowerCase()) && dev !== 'Unassigned') {
                 developersList.push(dev);
             }
         });
+        developersList.push('Unassigned');
 
-        let sectionsHtml = `<div class="flex flex-col gap-6 w-full">`;
-
-        developersList.forEach(dev => {
-            const itemsForDev = filteredDemands.filter(d => {
-                const assigned = (d.assigned_developer || '').trim();
-                return assigned.toLowerCase() === dev.toLowerCase();
-            });
-
-            sectionsHtml += `
-                <div class="bg-slate-200/60 rounded-xl p-4 border border-slate-300/60 flex flex-col gap-3">
-                    <div class="flex items-center justify-between border-b border-slate-300/80 pb-2">
-                        <h3 class="font-bold text-sm text-slate-800 tracking-wider">${escapeHtml(dev)}</h3>
-                        <span class="text-xs font-bold text-slate-600 bg-white px-2.5 py-0.5 rounded-full border border-slate-200">${itemsForDev.length} Demands</span>
-                    </div>
-
-                    ${itemsForDev.length > 0 
-                        ? `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            ${itemsForDev.map(item => createCardElement(item)).join('')}
-                           </div>`
-                        : `<div class="bg-white/50 border border-dashed border-slate-300 rounded-lg p-4 text-center text-xs text-slate-400">No demands assigned to ${escapeHtml(dev)}</div>`
-                    }
-                </div>
-            `;
-        });
-
-        sectionsHtml += `</div>`;
-        container.innerHTML = sectionsHtml;
+        renderColumns(developersList.map((dev, index) => ({
+            title: dev,
+            dot: index % 2 === 0 ? 'bg-brand-purple' : 'bg-brand-coral',
+            items: filteredDemands.filter(d => ((d.assigned_developer || 'Unassigned').trim()).toLowerCase() === dev.toLowerCase()),
+            emptyText: `No demands assigned to ${dev}`
+        })));
     }
 
     function renderApplicationGroupedBoard(filteredDemands) {
-        const container = document.getElementById('demandsContainer');
-        
         let appsList = ['Rhabah'];
-        const extraApps = Array.from(new Set(allDemands.map(d => d.department).filter(Boolean)));
+        const extraApps = Array.from(new Set(allDemands.map(d => d.department || 'General')));
 
         extraApps.forEach(app => {
             if (!appsList.some(a => a.toLowerCase() === app.toLowerCase())) {
@@ -459,33 +435,12 @@
             }
         });
 
-        let sectionsHtml = `<div class="flex flex-col gap-6 w-full">`;
-
-        appsList.forEach(app => {
-            const itemsForApp = filteredDemands.filter(d => {
-                const dept = (d.department || 'General').trim();
-                return dept.toLowerCase() === app.toLowerCase();
-            });
-
-            sectionsHtml += `
-                <div class="bg-slate-200/60 rounded-xl p-4 border border-slate-300/60 flex flex-col gap-3">
-                    <div class="flex items-center justify-between border-b border-slate-300/80 pb-2">
-                        <h3 class="font-bold text-sm text-slate-800 tracking-wider">${escapeHtml(app)}</h3>
-                        <span class="text-xs font-bold text-slate-600 bg-white px-2.5 py-0.5 rounded-full border border-slate-200">${itemsForApp.length} Demands</span>
-                    </div>
-
-                    ${itemsForApp.length > 0 
-                        ? `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            ${itemsForApp.map(item => createCardElement(item)).join('')}
-                           </div>`
-                        : `<div class="bg-white/50 border border-dashed border-slate-300 rounded-lg p-4 text-center text-xs text-slate-400">No demands for ${escapeHtml(app)}</div>`
-                    }
-                </div>
-            `;
-        });
-
-        sectionsHtml += `</div>`;
-        container.innerHTML = sectionsHtml;
+        renderColumns(appsList.map((app, index) => ({
+            title: app,
+            dot: index % 2 === 0 ? 'bg-brand-purple' : 'bg-brand-coral',
+            items: filteredDemands.filter(d => (d.department || 'General').trim().toLowerCase() === app.toLowerCase()),
+            emptyText: `No demands for ${app}`
+        })));
     }
 
     function renderSingleGrid(filteredDemands) {
