@@ -472,12 +472,12 @@ try {
         $smaxId = [string]$item.Id
         $smaxStatus = Get-FieldValue $item $statusField
         $existing = $existingRows[$smaxId]
-        $status = $statusMap[(Get-Key $smaxStatus)]
+        $status = if ($statusSource -eq 'local') { $null } else { $statusMap[(Get-Key $smaxStatus)] }
         if ($existing -and ($statusSource -eq 'local' -or -not $status)) {
             $status = $existing.status
         } elseif (-not $status) {
             $status = 'New'
-            if ($smaxStatus) { $unmapped["$smaxStatus"] = $true }
+            if ($smaxStatus -and $statusSource -ne 'local') { $unmapped["$smaxStatus"] = $true }
         }
         $created = ConvertTo-IsoDate (Get-FieldValue $item $createdField)
         $app = if ($appField) { Get-FieldValue $item $appField } else { $null }
