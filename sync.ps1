@@ -58,11 +58,13 @@ $requesterField = Get-Setting 'SMAX_REQUESTER_FIELD' ''
 $dueField = Get-Setting 'SMAX_DUE_FIELD' ''
 $onlyRule = Get-Setting 'SMAX_ONLY' ''
 $statusSource = (Get-Setting 'SMAX_STATUS_SOURCE' 'smax').Trim().ToLower()
-$maxPages = 50
+$maxPages = [int](Get-Setting 'SMAX_MAX_PAGES' '50')
 
 $boardStatuses = @('New', 'Requirement Gathering', 'Solution Design', 'Development', 'Testing', 'Deployment', 'Live')
 
-function Get-Key($text) { return ("$text" -replace '[^A-Za-z0-9]', '').ToLower() }
+function Remove-CustomSuffix($text) { return ("$text" -replace '_c$', '').Trim() }
+
+function Get-Key($text) { return ((Remove-CustomSuffix $text) -replace '[^A-Za-z0-9]', '').ToLower() }
 
 $statusMap = @{}
 foreach ($status in $boardStatuses) { $statusMap[(Get-Key $status)] = $status }
@@ -442,7 +444,10 @@ try {
         $onlyParts = $onlyRule.Split('=', 2)
         $allowed = @($onlyParts[1].Split(',') | ForEach-Object { $_.Trim().ToLower() } | Where-Object { $_ })
         $before = $smaxItems.Count
-        $smaxItems = @($smaxItems | Where-Object { $allowed -contains "$(Get-FieldValue $_ $onlyParts[0].Trim())".Trim().ToLower() })
+        $smaxItems = @($smaxItems | Where-Object {
+            $value = "$(Get-FieldValue $_ $onlyParts[0].Trim())".Trim()
+            if ($allowed -contains '*') { $value -ne '' } else { $allowed -contains $value.ToLower() -or $allowed -contains (Remove-CustomSuffix $value).ToLower() }
+        })
         Write-Host "[SYNC] SMAX_ONLY kept $($smaxItems.Count) of $before records"
     }
     $unmapped = @{}
@@ -477,7 +482,7 @@ try {
             title       = if ($item.DisplayLabel) { $item.DisplayLabel } else { 'Untitled request' }
             smax_status = if ($smaxStatus) { "$smaxStatus" } else { $null }
             status      = $status
-            department  = if ($app) { "$app" } else { 'General' }
+            department  = if ($app) { Remove-CustomSuffix $app } else { 'General' }
             created_at  = if ($created) { $created } else { [DateTime]::UtcNow.ToString('o') }
         }
         if ($assigneeField) {
