@@ -117,6 +117,7 @@
                         <option value="Testing">Testing</option>
                         <option value="Deployment">Deployment</option>
                         <option value="Live">Live</option>
+                        <option value="Completed">Completed</option>
                     </select>
                 </div>
 
@@ -139,7 +140,8 @@
         "Development",
         "Testing",
         "Deployment",
-        "Live"
+        "Live",
+        "Completed"
     ];
 
     async function requireEditor() {
@@ -259,7 +261,7 @@
             estimated_days: days,
             due_date: dueDate,
             status: status,
-            assigned_developer: currentDeveloperName
+            assigned_developer: 'Unassigned'
         }]).select();
 
         if (error) {
@@ -283,8 +285,7 @@
         const { error } = await supabaseClient.from('demands').update({
             estimated_days: days,
             due_date: dueDate,
-            status: newStatus,
-            assigned_developer: currentDeveloperName
+            status: newStatus
         }).eq('id', id);
 
         if (error) {

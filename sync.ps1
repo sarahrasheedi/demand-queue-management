@@ -60,7 +60,17 @@ $onlyRule = Get-Setting 'SMAX_ONLY' ''
 $statusSource = (Get-Setting 'SMAX_STATUS_SOURCE' 'smax').Trim().ToLower()
 $maxPages = [int](Get-Setting 'SMAX_MAX_PAGES' '50')
 
-$boardStatuses = @('New', 'Requirement Gathering', 'Solution Design', 'Development', 'Testing', 'Deployment', 'Live')
+$boardStatuses = @('New', 'Requirement Gathering', 'Solution Design', 'Development', 'Testing', 'Deployment', 'Live', 'Completed')
+$team = @((Get-Setting 'SMAX_TEAM' '').Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+
+function Find-TeamMember($name) {
+    $words = @("$name".ToLower() -split '\s+' | Where-Object { $_ })
+    foreach ($member in $team) {
+        $parts = @($member.ToLower() -split '\s+' | Where-Object { $_ })
+        if (-not ($parts | Where-Object { $words -notcontains $_ })) { return $member }
+    }
+    return $null
+}
 
 function Remove-CustomSuffix($text) { return ("$text" -replace '_c$', '').Trim() }
 
@@ -377,16 +387,16 @@ function Show-SmaxFields {
     if ($valueFields) { Show-FieldValues @($valueFields) }
 }
 
-function Get-ExistingStatuses($smaxIds) {
+function Get-ExistingRows($smaxIds) {
     $existing = @{}
     if ($useLocalStorage) {
-        foreach ($row in (Read-LocalDemands)) { if ($row.smax_id) { $existing["$($row.smax_id)"] = $row.status } }
+        foreach ($row in (Read-LocalDemands)) { if ($row.smax_id) { $existing["$($row.smax_id)"] = $row } }
         return $existing
     }
     for ($i = 0; $i -lt $smaxIds.Count; $i += 100) {
         $chunk = ($smaxIds[$i..([Math]::Min($i + 99, $smaxIds.Count - 1))] | ForEach-Object { "`"$_`"" }) -join ','
-        $found = Invoke-Json "$supabaseUrl/rest/v1/demands?select=smax_id,status&smax_id=in.($([Uri]::EscapeDataString($chunk)))" 'GET' (Get-SupabaseHeaders)
-        foreach ($row in $found) { $existing["$($row.smax_id)"] = $row.status }
+        $found = Invoke-Json "$supabaseUrl/rest/v1/demands?select=smax_id,status,assigned_developer&smax_id=in.($([Uri]::EscapeDataString($chunk)))" 'GET' (Get-SupabaseHeaders)
+        foreach ($row in $found) { $existing["$($row.smax_id)"] = $row }
     }
     return $existing
 }
@@ -452,10 +462,7 @@ try {
     }
     $unmapped = @{}
     $personNames = @{}
-    $existingStatuses = @{}
-    if ($statusSource -eq 'local') {
-        $existingStatuses = Get-ExistingStatuses @($smaxItems | ForEach-Object { [string]$_.Id })
-    }
+    $existingRows = Get-ExistingRows @($smaxItems | ForEach-Object { [string]$_.Id })
     $personFields = @($assigneeField, $requesterField) | Where-Object { $_ -and -not $_.Contains('/') -and -not $_.Contains(':') }
     if ($personFields) {
         $personNames = Get-PersonNames ($smaxItems | ForEach-Object { $item = $_; $personFields | ForEach-Object { Get-FieldValue $item $_ } })
@@ -464,12 +471,13 @@ try {
     $rows = foreach ($item in $smaxItems) {
         $smaxId = [string]$item.Id
         $smaxStatus = Get-FieldValue $item $statusField
+        $existing = $existingRows[$smaxId]
         $status = $statusMap[(Get-Key $smaxStatus)]
-        if ($statusSource -eq 'local' -and $existingStatuses.ContainsKey($smaxId)) {
-            $status = $existingStatuses[$smaxId]
+        if ($existing -and ($statusSource -eq 'local' -or -not $status)) {
+            $status = $existing.status
         } elseif (-not $status) {
             $status = 'New'
-            if ($smaxStatus -and $statusSource -ne 'local') { $unmapped["$smaxStatus"] = $true }
+            if ($smaxStatus) { $unmapped["$smaxStatus"] = $true }
         }
         $created = ConvertTo-IsoDate (Get-FieldValue $item $createdField)
         $app = if ($appField) { Get-FieldValue $item $appField } else { $null }
@@ -488,7 +496,12 @@ try {
         if ($assigneeField) {
             $assignee = Get-FieldValue $item $assigneeField
             if ($assignee -and $personNames.ContainsKey("$assignee")) { $assignee = $personNames["$assignee"] }
-            $row.assigned_developer = if ($assignee) { "$assignee" } else { 'Unassigned' }
+            $member = if ($assignee) { Find-TeamMember $assignee } else { $null }
+            $localMember = if ($existing) { Find-TeamMember $existing.assigned_developer } else { $null }
+            $row.assigned_developer = if ($member) { $member }
+                elseif ($team.Count -and $localMember) { $localMember }
+                elseif ($assignee) { "$assignee" }
+                else { 'Unassigned' }
         }
         if ($requesterField) {
             $requester = Get-FieldValue $item $requesterField
@@ -508,7 +521,7 @@ try {
     $target = if ($useLocalStorage) { "saved to $localDataFile" } else { 'sent to Supabase' }
     Write-Output "[SYNC] $([DateTime]::Now.ToString('s')) - $($rows.Count) demands from SMAX, $target"
     if ($unmapped.Count) {
-        Write-Warning "These SMAX statuses have no board column and were put under New. Add them to SMAX_STATUS_MAP: $($unmapped.Keys -join ', ')"
+        Write-Host "[SYNC] New demands with these SMAX statuses start under New (set their stage with Edit): $($unmapped.Keys -join ', ')"
     }
 } catch {
     Write-Error "[SYNC] Failed: $_"
