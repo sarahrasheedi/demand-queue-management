@@ -54,6 +54,9 @@ $personEntity = Get-Setting 'SMAX_PERSON_ENTITY' 'Person'
 $personNameField = Get-Setting 'SMAX_PERSON_NAME_FIELD' 'Name'
 $maxRecords = [int](Get-Setting 'SMAX_MAX_RECORDS' '0')
 $sinceDays = [int](Get-Setting 'SMAX_SINCE_DAYS' '0')
+$requesterField = Get-Setting 'SMAX_REQUESTER_FIELD' ''
+$dueField = Get-Setting 'SMAX_DUE_FIELD' ''
+$onlyRule = Get-Setting 'SMAX_ONLY' ''
 $statusSource = (Get-Setting 'SMAX_STATUS_SOURCE' 'smax').Trim().ToLower()
 $maxPages = 50
 
@@ -180,8 +183,21 @@ function ConvertTo-IsoDate($value) {
     try { return [DateTime]::Parse("$value", [Globalization.CultureInfo]::InvariantCulture, $styles).ToString('o') } catch { return $null }
 }
 
+function Get-JsonKeyValue($text, $key) {
+    if (-not $text) { return $null }
+    $pattern = '"' + [regex]::Escape($key) + '"\s*:\s*(?:"((?:[^"\\]|\\.)*)"|(-?[0-9.]+|true|false))'
+    $match = [regex]::Match("$text", $pattern)
+    if (-not $match.Success) { return $null }
+    if ($match.Groups[1].Success) { return [regex]::Unescape($match.Groups[1].Value) }
+    return $match.Groups[2].Value
+}
+
 function Get-FieldValue($item, $path) {
     if (-not $path) { return $null }
+    if ($path.Contains(':')) {
+        $parts = $path.Split(':', 2)
+        return Get-JsonKeyValue (Get-FieldValue $item $parts[0]) $parts[1]
+    }
     $value = $item
     foreach ($part in $path.Split('/')) {
         if ($null -eq $value) { return $null }
@@ -231,8 +247,10 @@ function Get-SmaxRequests {
     $version = Get-ODataVersion
     $select = New-Object System.Collections.Generic.List[string]
     $expand = New-Object System.Collections.Generic.List[string]
-    foreach ($field in @('Id', 'DisplayLabel', $createdField, $statusField, $assigneeField, $appField)) {
+    $onlyField = if ($onlyRule) { $onlyRule.Split('=', 2)[0].Trim() } else { $null }
+    foreach ($field in @('Id', 'DisplayLabel', $createdField, $statusField, $assigneeField, $appField, $requesterField, $dueField, $onlyField)) {
         if (-not $field) { continue }
+        $field = $field.Split(':', 2)[0]
         $parts = $field.Split('/', 2)
         if ($parts.Count -eq 2 -and $version -eq '2') {
             $select.Add($field)
@@ -286,11 +304,14 @@ function Get-PersonNames($ids) {
 
 function Show-FieldValues($fields) {
     $version = Get-ODataVersion
-    $url = "$odataBaseUrl/$entity" + '?$select=' + ($fields -join ',') + '&$top=500' + (Get-FilterQuery $version)
+    $baseFields = @($fields | ForEach-Object { $_.Split(':', 2)[0] } | Select-Object -Unique)
+    $url = "$odataBaseUrl/$entity" + '?$select=' + ($baseFields -join ',') + '&$top=500'
+    if ($createdField) { $url += '&$orderby=' + $createdField + ' desc' }
+    $url += Get-FilterQuery $version
     $items = @((Get-ODataPage (Invoke-Json $url 'GET' $smaxHeaders)).items)
     Write-Output ''
     foreach ($field in $fields) {
-        $groups = $items | Group-Object { "$($_.$field)" } | Sort-Object Count -Descending
+        $groups = $items | Group-Object { "$(Get-FieldValue $_ $field)" } | Sort-Object Count -Descending
         Write-Output "Values of $field (in $($items.Count) records): $(($groups | ForEach-Object { "$($_.Name) ($($_.Count))" }) -join ', ')"
     }
 }
@@ -349,8 +370,9 @@ function Show-SmaxFields {
         Write-Output ("  {0,-30} {1}" -f $property.Name, ($samples -join ' | '))
     }
 
-    $statusFields = @('PhaseId', 'Status', $statusField) | Where-Object { $_ -and $items[0].PSObject.Properties[$_] } | Select-Object -Unique
-    if ($statusFields) { Show-FieldValues @($statusFields) }
+    $valueFields = @('PhaseId', 'Status', 'WISStatus_c', $statusField, $appField, 'UserOptions:Type_c', 'UserOptions:System_c', 'UserOptions:Sector_c') |
+        Where-Object { $_ -and $items[0].PSObject.Properties[$_.Split(':', 2)[0]] } | Select-Object -Unique
+    if ($valueFields) { Show-FieldValues @($valueFields) }
 }
 
 function Get-ExistingStatuses($smaxIds) {
@@ -416,14 +438,22 @@ try {
     if ($RemoveDemo) { Remove-DemoDemands; exit 0 }
 
     $smaxItems = @(Get-SmaxRequests | Where-Object { $_.Id })
+    if ($onlyRule) {
+        $onlyParts = $onlyRule.Split('=', 2)
+        $allowed = @($onlyParts[1].Split(',') | ForEach-Object { $_.Trim().ToLower() } | Where-Object { $_ })
+        $before = $smaxItems.Count
+        $smaxItems = @($smaxItems | Where-Object { $allowed -contains "$(Get-FieldValue $_ $onlyParts[0].Trim())".Trim().ToLower() })
+        Write-Host "[SYNC] SMAX_ONLY kept $($smaxItems.Count) of $before records"
+    }
     $unmapped = @{}
     $personNames = @{}
     $existingStatuses = @{}
     if ($statusSource -eq 'local') {
         $existingStatuses = Get-ExistingStatuses @($smaxItems | ForEach-Object { [string]$_.Id })
     }
-    if ($assigneeField -and -not $assigneeField.Contains('/')) {
-        $personNames = Get-PersonNames ($smaxItems | ForEach-Object { Get-FieldValue $_ $assigneeField })
+    $personFields = @($assigneeField, $requesterField) | Where-Object { $_ -and -not $_.Contains('/') -and -not $_.Contains(':') }
+    if ($personFields) {
+        $personNames = Get-PersonNames ($smaxItems | ForEach-Object { $item = $_; $personFields | ForEach-Object { Get-FieldValue $item $_ } })
     }
 
     $rows = foreach ($item in $smaxItems) {
@@ -443,7 +473,7 @@ try {
 
         $row = [ordered]@{
             smax_id     = $smaxId
-            ref_id      = "SMAX-$smaxId"
+            ref_id      = $smaxId
             title       = if ($item.DisplayLabel) { $item.DisplayLabel } else { 'Untitled request' }
             smax_status = if ($smaxStatus) { "$smaxStatus" } else { $null }
             status      = $status
@@ -454,6 +484,15 @@ try {
             $assignee = Get-FieldValue $item $assigneeField
             if ($assignee -and $personNames.ContainsKey("$assignee")) { $assignee = $personNames["$assignee"] }
             $row.assigned_developer = if ($assignee) { "$assignee" } else { 'Unassigned' }
+        }
+        if ($requesterField) {
+            $requester = Get-FieldValue $item $requesterField
+            if ($requester -and $personNames.ContainsKey("$requester")) { $requester = $personNames["$requester"] }
+            $row.requester = if ($requester) { "$requester" } else { $null }
+        }
+        if ($dueField) {
+            $due = ConvertTo-IsoDate (Get-FieldValue $item $dueField)
+            $row.due_date = if ($due) { $due.Substring(0, 10) } else { $null }
         }
         $row
     }
