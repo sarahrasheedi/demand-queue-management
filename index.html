@@ -321,9 +321,9 @@
             : 'Not evaluated';
         const developerSelect = document.getElementById('editDeveloper');
         const currentDeveloper = matchDeveloper(item.assigned_developer);
-        developerSelect.innerHTML = [...DEVELOPERS.map(developerFullName), 'Unassigned']
+        developerSelect.innerHTML = `<option value="" disabled>Select developer</option>` + DEVELOPERS.map(developerFullName)
             .map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
-        developerSelect.value = currentDeveloper ? developerFullName(currentDeveloper) : 'Unassigned';
+        developerSelect.value = currentDeveloper ? developerFullName(currentDeveloper) : '';
         document.getElementById('editEffort').value = item.estimated_days || 1;
         document.getElementById('editCreationDate').value = item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : '';
         document.getElementById('editDueDate').value = item.due_date || '';
@@ -361,6 +361,7 @@
             created_at: document.getElementById('editCreationDate').value ? new Date(document.getElementById('editCreationDate').value).toISOString() : new Date().toISOString(),
             due_date: document.getElementById('editDueDate').value || null
         };
+        if (!updateData.assigned_developer) delete updateData.assigned_developer;
 
         const { error } = await supabaseClient.from('demands').update(updateData).eq('id', id);
 
@@ -420,13 +421,10 @@
     }
 
     function renderDeveloperGroupedBoard(filteredDemands) {
-        const columnFor = demand => matchDeveloper(demand.assigned_developer) || 'Unassigned';
-        const columns = [...DEVELOPERS, 'Unassigned'];
-
-        renderColumns(columns.map((dev, index) => ({
-            title: dev === 'Unassigned' ? dev : developerFullName(dev),
+        renderColumns(DEVELOPERS.map((dev, index) => ({
+            title: developerFullName(dev),
             dot: index % 2 === 0 ? 'bg-brand-purple' : 'bg-brand-coral',
-            items: filteredDemands.filter(d => columnFor(d) === dev),
+            items: filteredDemands.filter(d => matchDeveloper(d.assigned_developer) === dev),
             emptyText: `No demands assigned to ${dev}`
         })));
     }
