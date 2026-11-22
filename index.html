@@ -491,15 +491,6 @@
         renderStatistics();
     }
 
-    function countBy(demands, keyFor) {
-        const counts = new Map();
-        demands.forEach(d => {
-            const key = keyFor(d);
-            counts.set(key, (counts.get(key) || 0) + 1);
-        });
-        return [...counts.entries()].sort((a, b) => b[1] - a[1]);
-    }
-
     function renderStatistics() {
         const container = document.getElementById('demandsContainer');
         const appOf = d => (d.department || 'General').trim();
@@ -514,79 +505,45 @@
 
         const total = filtered.length;
         const completed = filtered.filter(d => d.status === 'Completed').length;
-        const open = total - completed;
-        const evaluated = filtered.filter(d => d.priority_score != null).length;
 
-        const select = (name, label, options) => `
-            <div class="flex flex-col gap-1 min-w-[180px] flex-1">
-                <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">${label}</label>
-                <select onchange="setStatsFilter('${name}', this.value)" class="px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-brand-purple outline-none">
-                    <option value="">All</option>
-                    ${options.map(o => `<option value="${escapeHtml(o.value)}" ${statsFilters[name] === o.value ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
-                </select>
-            </div>`;
         const unique = values => [...new Set(values)].sort((a, b) => a.localeCompare(b)).map(v => ({ value: v, label: v }));
+        const select = (name, label, options) => `
+            <select onchange="setStatsFilter('${name}', this.value)" class="flex-1 min-w-[150px] px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-brand-purple outline-none">
+                <option value="">${label}</option>
+                ${options.map(o => `<option value="${escapeHtml(o.value)}" ${statsFilters[name] === o.value ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
+            </select>`;
 
-        const kpi = (label, value, style) => `
-            <div class="rounded-xl p-5 border ${style}">
-                <div class="text-xs font-bold uppercase tracking-wider opacity-80">${label}</div>
-                <div class="text-3xl font-bold mt-1">${value}</div>
+        const number = (label, value, style) => `
+            <div class="rounded-xl p-5 text-center ${style}">
+                <div class="text-4xl font-bold">${value}</div>
+                <div class="text-xs font-bold uppercase tracking-wider mt-1 opacity-80">${label}</div>
             </div>`;
 
-        const statusCards = STATUSES.map(status => {
-            const count = filtered.filter(d => d.status === status).length;
-            const share = total ? Math.round(count / total * 100) : 0;
-            return `
-                <div class="bg-white rounded-xl border border-slate-200 p-4">
-                    <div class="flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full ${STATUS_STYLES[status].dot}"></span>
-                        <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">${status}</span>
-                    </div>
-                    <div class="text-2xl font-bold text-slate-900 mt-2">${count}</div>
-                    <div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden"><div class="h-full ${STATUS_STYLES[status].dot}" style="width:${share}%"></div></div>
-                    <div class="text-[11px] text-slate-400 mt-1">${share}%</div>
-                </div>`;
-        }).join('');
-
-        const breakdown = (title, rows) => `
-            <div class="bg-white rounded-xl border border-slate-200 p-4">
-                <h3 class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">${title}</h3>
-                ${rows.length ? rows.map(([name, count]) => `
-                    <div class="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0 text-sm">
-                        <span class="text-slate-700">${escapeHtml(name)}</span>
-                        <span class="font-bold text-brand-purple">${count}</span>
-                    </div>`).join('') : `<div class="text-xs text-slate-400">No demands</div>`}
-            </div>`;
-
-        const teamDemands = filtered.filter(d => matchDeveloper(d.assigned_developer));
+        const statusRows = STATUSES.map(status => `
+            <div class="flex justify-between items-center px-4 py-3 border-b border-slate-100 last:border-0">
+                <span class="flex items-center gap-2 text-sm text-slate-700">
+                    <span class="w-2.5 h-2.5 rounded-full ${STATUS_STYLES[status].dot}"></span>${status}
+                </span>
+                <span class="text-lg font-bold text-slate-900">${filtered.filter(d => d.status === status).length}</span>
+            </div>`).join('');
 
         container.innerHTML = `
-            <div class="flex flex-col gap-6">
-                <div class="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap items-end gap-4">
-                    ${select('developer', 'Developer', DEVELOPERS.map(dev => ({ value: dev, label: developerFullName(dev) })))}
-                    ${select('application', 'Application', unique(allDemands.map(appOf)))}
-                    ${select('requester', 'Requester', unique(allDemands.map(requesterOf)))}
-                    ${select('status', 'Status', STATUSES.map(st => ({ value: st, label: st })))}
+            <div class="max-w-3xl w-full mx-auto flex flex-col gap-5">
+                <div class="flex flex-wrap gap-2">
+                    ${select('developer', 'All Developers', DEVELOPERS.map(dev => ({ value: dev, label: developerFullName(dev) })))}
+                    ${select('application', 'All Applications', unique(allDemands.map(appOf)))}
+                    ${select('requester', 'All Requesters', unique(allDemands.map(requesterOf)))}
+                    ${select('status', 'All Statuses', STATUSES.map(st => ({ value: st, label: st })))}
                     <button onclick="resetStatsFilters()" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Reset</button>
                 </div>
 
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    ${kpi('Total Demands', total, 'bg-brand-purple text-white border-brand-purple')}
-                    ${kpi('Open', open, 'bg-brand-coral text-white border-brand-coral')}
-                    ${kpi('Completed', completed, 'bg-brand-purple-light text-brand-purple border-brand-purple/20')}
-                    ${kpi('Evaluated', `${evaluated} / ${total}`, 'bg-brand-coral-light text-brand-coral border-brand-coral/20')}
+                <div class="grid grid-cols-3 gap-4">
+                    ${number('Total', total, 'bg-brand-purple text-white')}
+                    ${number('Open', total - completed, 'bg-brand-coral text-white')}
+                    ${number('Completed', completed, 'bg-white text-brand-purple border border-slate-200')}
                 </div>
 
-                <div>
-                    <h3 class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Demands per Status</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">${statusCards}</div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    ${breakdown('By Developer', countBy(teamDemands, d => developerFullName(matchDeveloper(d.assigned_developer))))}
-                    ${breakdown('By Application', countBy(filtered, appOf))}
-                    ${breakdown('By Requester', countBy(filtered, requesterOf))}
-                </div>
+                <div class="bg-white rounded-xl border border-slate-200">${statusRows}</div>
             </div>`;
     }
 
