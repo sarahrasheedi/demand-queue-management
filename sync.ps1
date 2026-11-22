@@ -74,6 +74,12 @@ function Find-TeamMember($name) {
 
 function Remove-CustomSuffix($text) { return ("$text" -replace '_c$', '').Trim() }
 
+function Format-Label($text) {
+    $label = Remove-CustomSuffix $text
+    $label = $label -creplace '([a-z0-9])([A-Z])', '$1 $2' -creplace '([A-Z]+)([A-Z][a-z])', '$1 $2'
+    return ($label -replace '_', ' ' -replace '\s+', ' ').Trim()
+}
+
 function Get-Key($text) { return ((Remove-CustomSuffix $text) -replace '[^A-Za-z0-9]', '').ToLower() }
 
 $statusMap = @{}
@@ -518,7 +524,7 @@ try {
             title       = if ($item.DisplayLabel) { $item.DisplayLabel } else { 'Untitled request' }
             smax_status = if ($smaxStatus) { "$smaxStatus" } else { $null }
             status      = $status
-            department  = if ($app) { Remove-CustomSuffix $app } else { 'General' }
+            department  = if ($app) { Format-Label $app } else { 'General' }
             created_at  = if ($created) { $created } else { [DateTime]::UtcNow.ToString('o') }
         }
         if ($assigneeField) {
