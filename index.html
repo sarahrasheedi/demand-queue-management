@@ -320,10 +320,10 @@
             ? `${item.priority_score} / 100`
             : 'Not evaluated';
         const developerSelect = document.getElementById('editDeveloper');
-        const currentDeveloper = matchDeveloper(item.assigned_developer) || 'Unassigned';
-        developerSelect.innerHTML = [...DEVELOPERS, 'Unassigned']
+        const currentDeveloper = matchDeveloper(item.assigned_developer);
+        developerSelect.innerHTML = [...DEVELOPERS.map(developerFullName), 'Unassigned']
             .map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
-        developerSelect.value = currentDeveloper;
+        developerSelect.value = currentDeveloper ? developerFullName(currentDeveloper) : 'Unassigned';
         document.getElementById('editEffort').value = item.estimated_days || 1;
         document.getElementById('editCreationDate').value = item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : '';
         document.getElementById('editDueDate').value = item.due_date || '';
@@ -414,17 +414,17 @@
         })));
     }
 
+    function developerFullName(dev) {
+        const demand = allDemands.find(d => matchDeveloper(d.assigned_developer) === dev);
+        return demand ? demand.assigned_developer : dev;
+    }
+
     function renderDeveloperGroupedBoard(filteredDemands) {
-        const columnFor = demand => {
-            const name = (demand.assigned_developer || '').trim();
-            if (!name || name.toLowerCase() === 'unassigned') return 'Unassigned';
-            return matchDeveloper(name) || 'Others';
-        };
+        const columnFor = demand => matchDeveloper(demand.assigned_developer) || 'Unassigned';
         const columns = [...DEVELOPERS, 'Unassigned'];
-        if (filteredDemands.some(d => columnFor(d) === 'Others')) columns.push('Others');
 
         renderColumns(columns.map((dev, index) => ({
-            title: dev,
+            title: dev === 'Unassigned' ? dev : developerFullName(dev),
             dot: index % 2 === 0 ? 'bg-brand-purple' : 'bg-brand-coral',
             items: filteredDemands.filter(d => columnFor(d) === dev),
             emptyText: `No demands assigned to ${dev}`

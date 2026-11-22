@@ -1,6 +1,6 @@
 const DATA_MODE = 'local';
 
-const DEVELOPERS = ['Moaid', 'Tahani', 'Fatima Atef', 'Mushabbab'];
+const DEVELOPERS = ['Moaid', 'Tahani', 'Fatima Atef', 'Mushabar'];
 
 function matchDeveloper(name) {
     const words = String(name || '').toLowerCase().split(/\s+/).filter(Boolean);

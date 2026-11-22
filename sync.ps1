@@ -401,6 +401,17 @@ function Get-ExistingRows($smaxIds) {
     return $existing
 }
 
+function Remove-Demands($smaxIds) {
+    $smaxIds = @($smaxIds)
+    if (-not $smaxIds.Count) { return 0 }
+    if ($useLocalStorage) { return Remove-LocalSmaxRows $smaxIds }
+    for ($i = 0; $i -lt $smaxIds.Count; $i += 100) {
+        $chunk = ($smaxIds[$i..([Math]::Min($i + 99, $smaxIds.Count - 1))] | ForEach-Object { "`"$_`"" }) -join ','
+        Invoke-Json "$supabaseUrl/rest/v1/demands?smax_id=in.($([Uri]::EscapeDataString($chunk)))" 'DELETE' (Get-SupabaseHeaders) | Out-Null
+    }
+    return $smaxIds.Count
+}
+
 function Save-Demands($rows) {
     if (-not @($rows).Count) { return }
     if ($useLocalStorage) { return Save-LocalSmaxRows $rows }
@@ -468,8 +479,17 @@ try {
         $personNames = Get-PersonNames ($smaxItems | ForEach-Object { $item = $_; $personFields | ForEach-Object { Get-FieldValue $item $_ } })
     }
 
+    $outsideTeam = New-Object System.Collections.ArrayList
     $rows = foreach ($item in $smaxItems) {
         $smaxId = [string]$item.Id
+        $assignee = $null
+        $member = $null
+        if ($assigneeField) {
+            $assignee = Get-FieldValue $item $assigneeField
+            if ($assignee -and $personNames.ContainsKey("$assignee")) { $assignee = $personNames["$assignee"] }
+            $member = if ($assignee) { Find-TeamMember $assignee } else { $null }
+            if ($team.Count -and $assignee -and -not $member) { [void]$outsideTeam.Add($smaxId); continue }
+        }
         $smaxStatus = Get-FieldValue $item $statusField
         $existing = $existingRows[$smaxId]
         $status = if ($statusSource -eq 'local') { $null } else { $statusMap[(Get-Key $smaxStatus)] }
@@ -494,13 +514,9 @@ try {
             created_at  = if ($created) { $created } else { [DateTime]::UtcNow.ToString('o') }
         }
         if ($assigneeField) {
-            $assignee = Get-FieldValue $item $assigneeField
-            if ($assignee -and $personNames.ContainsKey("$assignee")) { $assignee = $personNames["$assignee"] }
-            $member = if ($assignee) { Find-TeamMember $assignee } else { $null }
             $localMember = if ($existing) { Find-TeamMember $existing.assigned_developer } else { $null }
-            $row.assigned_developer = if ($member) { $member }
-                elseif ($team.Count -and $localMember) { $localMember }
-                elseif ($assignee) { "$assignee" }
+            $row.assigned_developer = if ($assignee) { "$assignee" }
+                elseif ($localMember) { $existing.assigned_developer }
                 else { 'Unassigned' }
         }
         if ($requesterField) {
@@ -517,6 +533,10 @@ try {
     $rows = @($rows)
 
     Save-Demands $rows
+    if ($outsideTeam.Count) {
+        $removed = Remove-Demands $outsideTeam
+        Write-Host "[SYNC] Skipped $($outsideTeam.Count) demands assigned outside SMAX_TEAM ($removed removed from the board)"
+    }
 
     $target = if ($useLocalStorage) { "saved to $localDataFile" } else { 'sent to Supabase' }
     Write-Output "[SYNC] $([DateTime]::Now.ToString('s')) - $($rows.Count) demands from SMAX, $target"

@@ -56,6 +56,15 @@ function Save-LocalSmaxRows($rows) {
     Write-LocalDemands $list
 }
 
+function Remove-LocalSmaxRows($smaxIds) {
+    $ids = @($smaxIds | ForEach-Object { "$_" })
+    $list = Read-LocalDemands
+    $kept = New-Object System.Collections.ArrayList
+    foreach ($row in $list) { if ($ids -notcontains "$($row.smax_id)") { [void]$kept.Add($row) } }
+    Write-LocalDemands $kept
+    return $list.Count - $kept.Count
+}
+
 function Remove-LocalDemoRows {
     $list = Read-LocalDemands
     $kept = New-Object System.Collections.ArrayList
