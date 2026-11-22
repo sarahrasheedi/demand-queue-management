@@ -513,10 +513,46 @@
                 ${options.map(o => `<option value="${escapeHtml(o.value)}" ${statsFilters[name] === o.value ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}
             </select>`;
 
-        const number = (label, value, style) => `
-            <div class="rounded-xl p-5 text-center ${style}">
-                <div class="text-4xl font-bold">${value}</div>
-                <div class="text-xs font-bold uppercase tracking-wider mt-1 opacity-80">${label}</div>
+        const open = total - completed;
+        const parts = [
+            { label: 'Open', value: open, color: '#ff375e' },
+            { label: 'Completed', value: completed, color: '#4f008c' }
+        ];
+        const radius = 70;
+        const circumference = 2 * Math.PI * radius;
+        const gap = open && completed ? 2 : 0;
+        let offset = 0;
+        const segments = parts.map(part => {
+            if (!part.value) return '';
+            const length = part.value / total * circumference;
+            const share = Math.round(part.value / total * 100);
+            const segment = `
+                <circle r="${radius}" cx="90" cy="90" fill="none" stroke="${part.color}" stroke-width="22"
+                    stroke-dasharray="${Math.max(length - gap, 0)} ${circumference}" stroke-dashoffset="${-offset}"
+                    transform="rotate(-90 90 90)" class="cursor-pointer transition-opacity hover:opacity-80">
+                    <title>${part.label}: ${part.value} (${share}%)</title>
+                </circle>`;
+            offset += length;
+            return segment;
+        }).join('');
+
+        const legend = parts.map(part => `
+            <div class="flex items-center gap-3">
+                <span class="w-3 h-3 rounded-full" style="background:${part.color}"></span>
+                <span class="text-sm text-slate-600 w-24">${part.label}</span>
+                <span class="text-2xl font-bold text-slate-900">${part.value}</span>
+                <span class="text-xs text-slate-400">${total ? Math.round(part.value / total * 100) : 0}%</span>
+            </div>`).join('');
+
+        const donut = `
+            <div class="bg-white rounded-xl border border-slate-200 p-6 flex flex-col sm:flex-row items-center justify-center gap-10">
+                <svg viewBox="0 0 180 180" class="w-48 h-48" role="img" aria-label="Total ${total}, open ${open}, completed ${completed}">
+                    <circle r="${radius}" cx="90" cy="90" fill="none" stroke="#e2e8f0" stroke-width="22"></circle>
+                    ${segments}
+                    <text x="90" y="92" text-anchor="middle" font-size="36" font-weight="700" fill="#0f172a">${total}</text>
+                    <text x="90" y="114" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="1.5" fill="#64748b">TOTAL</text>
+                </svg>
+                <div class="flex flex-col gap-4">${legend}</div>
             </div>`;
 
         const statusRows = STATUSES.map(status => `
@@ -537,13 +573,11 @@
                     <button onclick="resetStatsFilters()" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Reset</button>
                 </div>
 
-                <div class="grid grid-cols-3 gap-4">
-                    ${number('Total', total, 'bg-brand-purple text-white')}
-                    ${number('Open', total - completed, 'bg-brand-coral text-white')}
-                    ${number('Completed', completed, 'bg-white text-brand-purple border border-slate-200')}
-                </div>
+                ${donut}
 
-                <div class="bg-white rounded-xl border border-slate-200">${statusRows}</div>
+                ${Object.values(statsFilters).some(Boolean)
+                    ? `<div class="bg-white rounded-xl border border-slate-200">${statusRows}</div>`
+                    : `<p class="text-center text-xs text-slate-400">Choose a filter above to see the demands per status.</p>`}
             </div>`;
     }
 
